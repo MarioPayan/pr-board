@@ -92,7 +92,7 @@ func (s *Server) init() {
 		s.Idle = 10 * time.Minute
 	}
 	if s.RefreshEvery == 0 {
-		s.RefreshEvery = 5 * time.Minute
+		s.RefreshEvery = DefaultRefreshEvery
 	}
 }
 

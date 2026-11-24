@@ -26,6 +26,9 @@ const usage = `usage:
   pr-board refresh                        collect from GitHub now
   pr-board cleanup [--dry-run] [--yes]    clean up merged PRs (asks y/N unless --yes)
   pr-board status                         show the running server
+  pr-board line                           statusline segment from the stored board; never waits
+  pr-board list                           your open PRs and the ones to review, one row each
+  pr-board legend                         what the segment and the list's glyphs mean
   pr-board stop                           stop the running server
   pr-board collect --json                 collect once without a server and print the store
   pr-board demo [--port N] [--open]       serve a fictional board (no GitHub, no files touched) until Ctrl-C
@@ -41,8 +44,16 @@ func main() {
 	} else if len(args) > 0 && args[0] == "--demo" {
 		cmd, args = "demo", args[1:]
 	}
-	if cmd == "hook" {
+	switch cmd {
+	case "hook":
 		hook(args, os.Stdin) // never fails the session
+		return
+	case "line":
+		// a statusline segment: never waits, never shouts
+		p, err := defaultPaths(io.Discard)
+		if err == nil {
+			cmdLine(os.Stdout, p, os.LookupEnv, time.Now(), func() error { return prboard.SpawnDetached(p.Log(), "serve") })
+		}
 		return
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -65,6 +76,10 @@ func main() {
 		err = cmdCollect(ctx, args, os.Stdout)
 	case "demo":
 		err = cmdDemo(ctx, args, os.Stdout)
+	case "list":
+		cmdList(os.Stdout, paths(), os.LookupEnv, time.Now())
+	case "legend", "key":
+		fmt.Print(termFromEnv(prboard.Paths{}, os.LookupEnv, time.Now()).Legend())
 	case "session-loop":
 		err = cmdSessionLoop(ctx, args)
 	case "help", "-h", "--help":

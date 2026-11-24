@@ -240,8 +240,8 @@ html,body{margin:0;background:var(--bg)}
   "use strict";
   const STATES=[
     ["ready","green","Ready to merge","Approved, every check passed, mergeable, not behind, nothing required first."],
-    ["approve","amber","Ready to approve","Everything is in place except an approval."],
     ["missing","red","Something missing","CI failing or running, conflicts, behind, changes requested, a branch rule or a required PR still open. The icons say which."],
+    ["approve","amber","Ready to approve","Everything is in place except an approval."],
     ["draft","muted","Drafts","Yours, still drafts, whatever else they need: counted apart from the colours. The row keeps its red bar, dashed, with a DRAFT tag."]
   ];
   // the header counter an open card counts in: a draft is its own, whatever its colour

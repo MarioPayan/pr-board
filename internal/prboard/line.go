@@ -110,9 +110,9 @@ func StateCounts(v View) map[string]int {
 }
 
 // Segment is the statusline segment: the label, then your open PRs by
-// colour (something missing, ready to approve, ready to merge), your drafts
-// and how many wait on your review. A zero is left out; the label alone means nothing is
-// open. A store that was never filled prints nothing.
+// colour (ready to merge, something missing, ready to approve), how many
+// wait on your review and, last, your drafts. A zero is left out; the label
+// alone means nothing is open. A store that was never filled prints nothing.
 func (t Term) Segment(s *Store) string {
 	if s == nil || s.Refreshed.IsZero() {
 		return ""
@@ -128,11 +128,11 @@ func (t Term) Segment(s *Store) string {
 		n          int
 		glyph, col string
 	}{
+		{c[StReady], g.ok, cGreen},
 		{c[StMissing], g.fail, cRed},
 		{c[StApprove], g.pend, cAmber},
-		{c[StReady], g.ok, cGreen},
-		{c[StDraft], g.draft, cGrey},
 		{v.ToReview, g.eyes, cCyan},
+		{c[StDraft], g.draft, cGrey},
 	} {
 		if x.n > 0 {
 			parts = append(parts, t.paint(fmt.Sprintf("%s%d", x.glyph, x.n), x.col))
@@ -327,19 +327,19 @@ func (t Term) Legend() string {
 		label = "the segment"
 	}
 	// the example is fixed so the tree lines up
-	return fmt.Sprintf(`    [PRs] %[1]s8 %[2]s3 %[3]s2 %[9]s4 %[4]s6
-          %[5]s  %[5]s  %[5]s  %[5]s  %[6]s six are waiting on your review
-          %[5]s  %[5]s  %[5]s  %[6]s four of yours are drafts
-          %[5]s  %[5]s  %[6]s two of yours are ready to merge
-          %[5]s  %[6]s three of yours are ready to approve
-          %[6]s eight of yours have something missing
+	return fmt.Sprintf(`    [PRs] %[3]s2 %[1]s8 %[2]s3 %[4]s6 %[9]s4
+          %[5]s  %[5]s  %[5]s  %[5]s  %[6]s four of yours are drafts
+          %[5]s  %[5]s  %[5]s  %[6]s six are waiting on your review
+          %[5]s  %[5]s  %[6]s three of yours are ready to approve
+          %[5]s  %[6]s eight of yours have something missing
+          %[6]s two of yours are ready to merge
 
+    %[3]s  ready to merge      approved, every check passed, mergeable
     %[1]s  something missing   CI failing or running, a conflict, behind, changes
                           requested, a branch rule or a required PR still open
     %[2]s  ready to approve    everything is in place except an approval
-    %[3]s  ready to merge      approved, every check passed, mergeable
-    %[9]s  drafts              yours, still drafts, whatever else they need
     %[4]s  to review           someone else's open PR that requests your review
+    %[9]s  drafts              yours, still drafts, whatever else they need
 
 These are the page's header counters, so the segment and the board always agree.
 A count of zero is left out, so %[7]s on its own means nothing is open. The label

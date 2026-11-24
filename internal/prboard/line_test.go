@@ -48,7 +48,7 @@ func TestSegment(t *testing.T) {
 		store *Store
 		want  string
 	}{
-		{"counts worst first", nil, lineStore(2, 1, 3, 4), "[PRs] ✗2 ◷1 ✓3 ⊙4"},
+		{"counts by importance: merge, missing, approve, review", nil, lineStore(2, 1, 3, 4), "[PRs] ✓3 ✗2 ◷1 ⊙4"},
 		{"zeros are left out", nil, lineStore(0, 2, 0, 0), "[PRs] ◷2"},
 		{"only reviews", nil, lineStore(0, 0, 0, 5), "[PRs] ⊙5"},
 		{"nothing open is the label alone", nil, lineStore(0, 0, 0, 0), "[PRs]"},
@@ -59,16 +59,23 @@ func TestSegment(t *testing.T) {
 		{"a due refresh says nothing", nil, func() *Store { s := lineStore(1, 0, 0, 0); s.Refreshed = now.Add(-19 * time.Minute); return s }(), "[PRs] ✗1"},
 		{"far past the refresh window says its age", nil, func() *Store { s := lineStore(1, 0, 0, 0); s.Refreshed = now.Add(-25 * time.Minute); return s }(), "[PRs] ✗1 (stale 25m)"},
 		{"hours stale", nil, func() *Store { s := lineStore(0, 0, 1, 0); s.Refreshed = now.Add(-3 * time.Hour); return s }(), "[PRs] ✓1 (stale 3h)"},
-		{"ascii", func(t Term) Term { t.ASCII = true; return t }, lineStore(1, 1, 1, 1), "[PRs] x1 ~1 +1 @1"},
+		{"ascii", func(t Term) Term { t.ASCII = true; return t }, lineStore(1, 1, 1, 1), "[PRs] +1 x1 ~1 @1"},
 		{"NO_COLOR drops the link too", func(t Term) Term { t.Link = "http://127.0.0.1:7878/"; return t }, lineStore(1, 0, 0, 0), "[PRs] ✗1"},
 		{"colour and link", func(Term) Term { return colour }, lineStore(1, 0, 1, 2),
-			"\x1b]8;;http://127.0.0.1:7878/\x1b\\\x1b[36m[PRs]\x1b[0m\x1b]8;;\x1b\\ \x1b[31m✗1\x1b[0m \x1b[32m✓1\x1b[0m \x1b[36m⊙2\x1b[0m"},
+			"\x1b]8;;http://127.0.0.1:7878/\x1b\\\x1b[36m[PRs]\x1b[0m\x1b]8;;\x1b\\ \x1b[32m✓1\x1b[0m \x1b[31m✗1\x1b[0m \x1b[36m⊙2\x1b[0m"},
 		{"colour without link", func(Term) Term { c := colour; c.Link = ""; return c }, lineStore(0, 0, 0, 0), "\x1b[36m[PRs]\x1b[0m"},
 		{"drafts count on their own, not as something missing", nil, func() *Store {
 			s := lineStore(2, 0, 1, 1)
 			s.PRs[0].Draft, s.PRs[2].Draft = true, true
 			return s
-		}(), "[PRs] ✗1 ✎2 ⊙1"},
+		}(), "[PRs] ✗1 ⊙1 ✎2"},
+		{"drafts come last, after the reviews", nil, func() *Store {
+			s := lineStore(1, 1, 1, 2)
+			s.PRs[0].Draft = true
+			s.PRs = append(s.PRs, lineStore(1, 0, 0, 0).PRs...)
+			s.PRs[len(s.PRs)-1].Number = 99
+			return s
+		}(), "[PRs] ✓1 ✗1 ◷1 ⊙2 ✎1"},
 		{"drafts in ascii", func(t Term) Term { t.ASCII = true; return t }, func() *Store {
 			s := lineStore(0, 1, 0, 0)
 			s.PRs[0].Draft = true
@@ -106,7 +113,7 @@ func TestSegmentMatchesTheHeaderCounters(t *testing.T) {
 	for _, x := range []struct {
 		n int
 		g string
-	}{{c[StMissing], "✗"}, {c[StApprove], "◷"}, {c[StReady], "✓"}, {c[StDraft], "✎"}, {BuildView(s, now).ToReview, "⊙"}} {
+	}{{c[StReady], "✓"}, {c[StMissing], "✗"}, {c[StApprove], "◷"}, {BuildView(s, now).ToReview, "⊙"}, {c[StDraft], "✎"}} {
 		if x.n > 0 {
 			want += " " + x.g + strconv.Itoa(x.n)
 		}
@@ -215,11 +222,11 @@ func TestListColoursTheNumberByState(t *testing.T) {
 
 func TestLegendFollowsTheGlyphs(t *testing.T) {
 	tm := plainTerm()
-	if l := tm.Legend(); !strings.Contains(l, "✗8 ◷3 ✓2 ✎4 ⊙6") || !strings.Contains(l, "└ eight") || !strings.Contains(l, "✎  drafts") {
+	if l := tm.Legend(); !strings.Contains(l, "✓2 ✗8 ◷3 ⊙6 ✎4") || !strings.Contains(l, "└ two of yours are ready to merge") || !strings.Contains(l, "✎  drafts") {
 		t.Errorf("unicode legend:\n%s", l)
 	}
 	tm.ASCII = true
-	if l := tm.Legend(); !strings.Contains(l, "x8 ~3 +2 d4 @6") || strings.ContainsAny(l, "✗◷✓✎⊙│└") {
+	if l := tm.Legend(); !strings.Contains(l, "+2 x8 ~3 @6 d4") || strings.ContainsAny(l, "✗◷✓✎⊙│└") {
 		t.Errorf("ascii legend:\n%s", l)
 	}
 }

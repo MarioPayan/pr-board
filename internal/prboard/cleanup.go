@@ -227,16 +227,46 @@ func (c Cleaner) worktreeSkip(ctx context.Context, w worktree, live []string) st
 	return ""
 }
 
-// branchSkip returns why a local branch must be kept, or "".
-func (c Cleaner) branchSkip(ctx context.Context, clone, tip, headOID string) string {
-	if tip == headOID {
+// branchSkip returns why a local branch must be kept, or "". When the PR
+// head commit is not in the clone (more commits were pushed from elsewhere),
+// it is fetched from the PR's pull ref first, so a tip that is an ancestor of
+// it is not mistaken for unpushed work.
+func (c Cleaner) branchSkip(ctx context.Context, clone, tip string, p PR) string {
+	if tip == p.HeadOID {
 		return ""
 	}
-	if headOID == "" {
+	if p.HeadOID == "" {
 		return "PR head commit unknown"
 	}
-	if _, err := c.Run(ctx, clone, "git", "merge-base", "--is-ancestor", tip, headOID); err != nil {
+	has := func() bool {
+		_, err := c.Run(ctx, clone, "git", "cat-file", "-e", p.HeadOID+"^{commit}")
+		return err == nil
+	}
+	if !has() {
+		if remote := c.remoteFor(ctx, clone, p.Repo); remote != "" {
+			c.Run(ctx, clone, "git", "fetch", "-q", "--no-tags", remote, fmt.Sprintf("pull/%d/head", p.Number))
+		}
+		if !has() {
+			return "could not verify: PR head not available locally"
+		}
+	}
+	if _, err := c.Run(ctx, clone, "git", "merge-base", "--is-ancestor", tip, p.HeadOID); err != nil {
 		return fmt.Sprintf("unpushed work: tip %s is not the PR head or an ancestor of it", short(tip))
+	}
+	return ""
+}
+
+// remoteFor names the clone's remote for owner/name, or "".
+func (c Cleaner) remoteFor(ctx context.Context, clone, repo string) string {
+	b, err := c.Run(ctx, clone, "git", "remote", "-v")
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		name, _, _ := strings.Cut(line, "\t")
+		if m := ghRemote.FindStringSubmatch(line); m != nil && strings.EqualFold(m[1]+"/"+m[2], repo) {
+			return name
+		}
 	}
 	return ""
 }
@@ -299,7 +329,7 @@ func (c Cleaner) Plan(ctx context.Context, prs []PR) []PlanItem {
 			hasBranch := err == nil && tip != ""
 			bskip := ""
 			if hasBranch {
-				bskip = c.branchSkip(ctx, clone, tip, p.HeadOID)
+				bskip = c.branchSkip(ctx, clone, tip, p)
 			}
 			for _, w := range c.worktrees(ctx, clone) {
 				if w.Branch != p.Head {

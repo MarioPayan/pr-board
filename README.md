@@ -136,7 +136,7 @@ Upgrading from pr-map: on the first run, when `~/.config/pr-board/config.json` o
   - the GitHub head branch (`gh api -X DELETE repos/O/R/git/refs/heads/B`), only if it still exists, lives in the same repository (not a fork) and is not the default branch;
   - local worktrees on that branch, in clones under `clone_roots` (3 levels deep, symlinked roots counted once) whose remote is that repository;
   - the local branch.
-- **What it keeps, and says why:** a worktree with uncommitted changes, a HEAD commit younger than 30 minutes, or a live Claude session inside it (`claude agents --json` cwd); the main clone's own checkout; a local branch whose tip is neither the PR head nor an ancestor of it (unpushed work); any branch named like the default branch. A PR with anything kept or failed stays on the board, so a second Clean up can finish it.
+- **What it keeps, and says why:** a worktree with uncommitted changes, a HEAD commit younger than 30 minutes, or a live Claude session inside it (`claude agents --json` cwd); the main clone's own checkout; a local branch whose tip is neither the PR head nor an ancestor of it (unpushed work; when the PR head commit is not in the clone, it is fetched from `pull/N/head` first, and a head that still cannot be found keeps the branch as "could not verify"); any branch named like the default branch. A PR with anything kept or failed stays on the board, so a second Clean up can finish it.
 - The hook never blocks or fails a session: it exits 0 on every path.
 - No tokens: GitHub access is your `gh` login.
 

@@ -237,3 +237,64 @@ func TestClonesMatchRemotes(t *testing.T) {
 		t.Errorf("clones: %v", got)
 	}
 }
+
+// A PR that got more commits pushed from elsewhere: the local tip is an
+// ancestor of the PR head, but the head commit was never fetched. Cleanup
+// fetches the pull ref before judging; a head it still cannot find is
+// "could not verify", never unpushed work.
+func TestCleanupFetchesMissingPRHead(t *testing.T) {
+	gitEnv(t)
+	root := t.TempDir()
+	upstream := filepath.Join(t.TempDir(), "upstream.git")
+	git(t, root, nil, "init", "-q", "--bare", upstream)
+	clone := filepath.Join(root, "widgets")
+	os.MkdirAll(clone, 0o755)
+	git(t, clone, nil, "init", "-q")
+	git(t, clone, nil, "remote", "add", "origin", upstream)
+	// the GitHub URL is only the push URL, so fetches go to the local upstream
+	git(t, clone, nil, "remote", "set-url", "--push", "origin", "git@github.com:acme/widgets.git")
+	commit(t, clone, "README", old)
+	git(t, clone, nil, "push", "-q", upstream, "main")
+	git(t, clone, nil, "checkout", "-q", "-b", "behind")
+	tip := commit(t, clone, "b1", old)
+	git(t, clone, nil, "branch", "gone", tip)
+	git(t, clone, nil, "push", "-q", upstream, "behind")
+	git(t, clone, nil, "checkout", "-q", "main")
+	// someone else pushes b2 to the PR; the clone never sees it
+	elsewhere := filepath.Join(t.TempDir(), "elsewhere")
+	git(t, root, nil, "clone", "-q", "-b", "behind", upstream, elsewhere)
+	head := commit(t, elsewhere, "b2", old)
+	git(t, elsewhere, nil, "push", "-q", "origin", "HEAD:refs/pull/7/head")
+	if _, err := ExecRunner(context.Background(), clone, "git", "cat-file", "-e", head+"^{commit}"); err == nil {
+		t.Fatal("setup: the PR head must not be in the clone yet")
+	}
+
+	run := func(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
+		if name == "gh" {
+			return nil, errNotFound // the GitHub branches are already deleted
+		}
+		return ExecRunner(ctx, dir, name, args...)
+	}
+	c := Cleaner{Run: run, Roots: []string{root}, Depth: 3, MinAge: 30 * time.Minute, Now: time.Now}
+	prs := []PR{
+		{Repo: "acme/widgets", Number: 7, State: "MERGED", Head: "behind", HeadOID: head, HeadRepo: "acme/widgets", DefaultBranch: "main"},
+		{Repo: "acme/widgets", Number: 8, State: "MERGED", Head: "gone", HeadOID: "0123456789abcdef0123456789abcdef01234567", HeadRepo: "acme/widgets", DefaultBranch: "main"},
+	}
+	got := map[int]string{}
+	for _, it := range c.Plan(context.Background(), prs) {
+		var ls []string
+		for _, s := range it.Steps {
+			ls = append(ls, s.Kind+" skip("+s.Skip+")")
+		}
+		got[it.N] = strings.Join(ls, "; ")
+	}
+	want := map[int]string{
+		7: "branch skip()",
+		8: "branch skip(could not verify: PR head not available locally)",
+	}
+	for n, w := range want {
+		if got[n] != w {
+			t.Errorf("PR %d:\n got  %s\n want %s", n, got[n], w)
+		}
+	}
+}

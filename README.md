@@ -84,7 +84,7 @@ pr-board demo [--port N] [--open]     # serve the fictional demo board until Ctr
 Config: `~/.config/pr-board/config.json`, written with these defaults on first run:
 
 ```json
-{"owners":[],"author":"@me","merged_days":7,"clone_roots":["~/repos","~/src","~/code"],"idle_minutes":10}
+{"owners":[],"author":"@me","merged_days":7,"clone_roots":["~/repos","~/src","~/code"],"idle_minutes":10,"port":7878}
 ```
 
 `owners` lists the GitHub users or organizations to search; until it names one, the page shows where to add them instead of an empty board. The server reads the config on every refresh, so no restart is needed.
@@ -95,7 +95,7 @@ Upgrading from pr-map: on the first run, when `~/.config/pr-board/config.json` o
 
 ## How it runs
 
-- **One server per machine.** `pr-board up` reuses the server named in the lock file after checking that its pid is alive and that `/api/health` on its port answers with that pid; otherwise it starts a new one detached. The server holds an exclusive `flock`, so two racing starts end with one server. It binds `127.0.0.1` on a free port.
+- **One server per machine.** `pr-board up` reuses the server named in the lock file after checking that its pid is alive and that `/api/health` on its port answers with that pid; otherwise it starts a new one detached. The server holds an exclusive `flock`, so two racing starts end with one server. It binds `127.0.0.1:7878` (the config's `port`), so a saved link keeps working across restarts, and falls back to a free port when that one is taken.
 - **Collecting.** On start, on Refresh and every 5 minutes: `gh search prs` for your open PRs and those merged in the last `merged_days`, then batched `gh api graphql` queries (15 PRs each) for review, check, merge and thread state. Merged PRs stay on the board until cleaned up; closed-unmerged ones leave it.
 - **Staying alive.** Start counts as a check-in, and so does every heartbeat: each Claude session's loop posts one every 3 minutes, and an open page posts one every 60 seconds (and re-fetches the board). The server exits `idle_minutes` after the last check-in and removes its lock file.
 - **Session check-in.** The SessionStart hook runs `pr-board up` for the session and starts a detached `pr-board session-loop`, which posts a heartbeat every 3 minutes and exits when `claude agents --json` no longer lists its session.

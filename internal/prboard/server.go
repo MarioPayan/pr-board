@@ -333,7 +333,7 @@ func (s *Server) merged() []PR {
 	defer s.mu.Unlock()
 	var out []PR
 	for _, p := range s.store.PRs {
-		if p.State == "MERGED" {
+		if p.State == "MERGED" && !p.ToReview {
 			out = append(out, p)
 		}
 	}

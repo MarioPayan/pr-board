@@ -13,7 +13,8 @@ import (
 // PR that is not on the board, drafts, stale PRs, PRs with many threads,
 // long titles, PRs without a category, a repo whose default branch is
 // production, every signal at least once (a dismissed approval, a requested
-// team) and several cards whose signals overflow into "+N".
+// team), several cards whose signals overflow into "+N", and four PRs of
+// teammates that ask for a review.
 func DemoStore(now time.Time) *Store {
 	ago := func(d time.Duration) time.Time { return now.Add(-d) }
 	day := 24 * time.Hour
@@ -46,6 +47,11 @@ func DemoStore(now time.Time) *Store {
 		}
 	}
 	threads := func(n int) []Thread { return make([]Thread, n) }
+	review := func(p *PR, author string) {
+		p.ToReview, p.Author = true, author
+		p.ReviewDecision, p.Reviews, p.Requests = "REVIEW_REQUIRED", []Review{}, []string{"you"}
+		p.MergeState = "BLOCKED"
+	}
 
 	prs := []PR{
 		// web: #415 must wait for #412
@@ -221,6 +227,21 @@ func DemoStore(now time.Time) *Store {
 		pr("data", 88, "Drop the unused staging tables", func(p *PR) { approvedBy(p, "dave") }),
 		pr("data", 74, "[Reporting] Tests for the revenue models", mergedAgo(2*day)),
 		pr("data", 72, "[Billing] Currency conversion table", mergedAgo(6*day)),
+
+		// teammates' PRs that ask for a review
+		pr("web", 440, "[Checkout] Gift cards at checkout", func(p *PR) { review(p, "grace") }),
+		pr("api", 258, "[Search] Facet counts for the product search", func(p *PR) {
+			review(p, "ivan")
+			p.ChecksPending = 2
+		}),
+		pr("mobile", 158, "Dark mode for the settings screen", func(p *PR) {
+			review(p, "judy")
+			p.Threads = threads(2)
+		}),
+		pr("data", 90, "[Reporting] Late refunds land in the right month", func(p *PR) {
+			review(p, "heidi")
+			p.ChecksFailing = []string{"dbt test"}
+		}),
 	}
 	// a requirement takes the state of the PR it names: one on the board,
 	// web#399 closed without merging, web#430 open (someone else's PR),

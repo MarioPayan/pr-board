@@ -313,8 +313,8 @@ func (c Cleaner) Plan(ctx context.Context, prs []PR) []PlanItem {
 	}
 	items := []PlanItem{}
 	for _, p := range prs {
-		if p.State != "MERGED" {
-			continue
+		if p.State != "MERGED" || p.ToReview {
+			continue // reviews are someone else's branches
 		}
 		it := PlanItem{Key: p.Key(), Repo: p.Repo, N: p.Number, Title: p.Title, Steps: []Step{}}
 		if s := c.remoteStep(ctx, p); s != nil {

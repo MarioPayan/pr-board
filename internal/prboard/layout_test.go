@@ -198,3 +198,33 @@ func TestViewHasNoNullLists(t *testing.T) {
 		}
 	}
 }
+
+func TestReviewGroup(t *testing.T) {
+	mine := openPR(1, "a", "main")
+	rv := func(repo string, n int, head, baseRef string) PR {
+		p := in(repo, openPR(n, head, baseRef))
+		p.ToReview, p.Author = true, "bob"
+		p.Title = "[Billing] review me"
+		return p
+	}
+	merged := rv("acme/app", 9, "z", "main")
+	merged.State = "MERGED"
+	// #3 is based on my branch, yet a review never joins a chain or a group
+	s := &Store{PRs: []PR{mine, rv("acme/app", 3, "c", "a"), rv("acme/web", 4, "d", "main"), rv("acme/app", 2, "b", "main"), merged}}
+	v := BuildView(s, now)
+	if v.Open != 1 || v.Merged != 0 || v.ToReview != 3 {
+		t.Fatalf("counts: open %d merged %d to review %d", v.Open, v.Merged, v.ToReview)
+	}
+	if got, want := rowString(v.Review), "#3 #2 web#4"; got != want {
+		t.Errorf("review rows %q want %q", got, want)
+	}
+	if got := strings.Join(v.Review.Repos, ","); got != "acme/app,acme/web" || v.Review.Key != "To review" || len(v.Review.Merged) != 0 {
+		t.Errorf("review group %+v", v.Review)
+	}
+	if r := v.Review.Rows[0]; r.Parent != "" || r.Depth != 0 || r.Author != "bob" {
+		t.Errorf("review row %+v", r)
+	}
+	if got := groupsString(v.Categories) + " / " + groupsString(v.Repos); got != ": #1 / acme/app: #1" {
+		t.Errorf("groups %q: reviews must stay out", got)
+	}
+}

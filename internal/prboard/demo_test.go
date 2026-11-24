@@ -88,6 +88,14 @@ func TestDemoStore(t *testing.T) {
 			}
 		}
 	}
+	if v.ToReview != 4 || len(v.Review.Rows) != 4 {
+		t.Errorf("to review %d rows %d, want 4", v.ToReview, len(v.Review.Rows))
+	}
+	for _, r := range v.Review.Rows {
+		if r.Author == "" || r.Parent != "" {
+			t.Errorf("review row %s author %q parent %q", r.Key, r.Author, r.Parent)
+		}
+	}
 	if total := v.Open + v.Merged; total < 55 || total > 65 {
 		t.Errorf("demo has %d PRs, want 55 to 65", total)
 	}

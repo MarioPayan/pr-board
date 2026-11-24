@@ -26,6 +26,7 @@ type Card struct {
 	Parent string `json:"parent,omitempty"` // key of the open PR it waits on
 	Link   string `json:"link,omitempty"`   // "stack" (base branch) or "required" ([required:] in the body)
 	After  string `json:"after,omitempty"`  // "after #N" or "after repo#N", naming Parent
+	Author string `json:"author,omitempty"`
 	Derived
 }
 
@@ -46,11 +47,15 @@ type Group struct {
 }
 
 // View is GET /api/prs. Categories and Repos hold the same PRs, grouped
-// two ways; the page shows one of them.
+// two ways; the page shows one of them. Review holds the open PRs of others
+// that ask for the user's review, above either grouping; they are not in
+// Open, Categories or Repos.
 type View struct {
 	Refreshed  time.Time `json:"refreshed,omitzero"`
 	Open       int       `json:"open"`
 	Merged     int       `json:"merged"`
+	ToReview   int       `json:"to_review"`
+	Review     Group     `json:"review"`
 	Errors     []string  `json:"errors,omitempty"`
 	Setup      string    `json:"setup,omitempty"` // the config file to edit when it names no owners
 	Categories []Group   `json:"categories"`      // alphabetical, Untagged last
@@ -59,11 +64,21 @@ type View struct {
 
 // BuildView chains the open PRs and groups the store by category and by repository.
 func BuildView(s *Store, now time.Time) View {
-	v := View{Refreshed: s.Refreshed, Errors: s.Errors, Categories: []Group{}, Repos: []Group{}}
+	v := View{Refreshed: s.Refreshed, Errors: s.Errors, Categories: []Group{}, Repos: []Group{},
+		Review: Group{Key: "To review", Repos: []string{}, Rows: []Row{}, Merged: []Card{}}}
 	var open []PR
 	var merged []Card
 	branch := map[string]string{}
 	for _, p := range s.PRs {
+		if p.ToReview {
+			if p.State == "OPEN" {
+				v.Review.Rows = append(v.Review.Rows, Row{Card: makeCard(p, now)})
+				if !slices.Contains(v.Review.Repos, p.Repo) {
+					v.Review.Repos = append(v.Review.Repos, p.Repo)
+				}
+			}
+			continue
+		}
 		if branch[p.Repo] == "" {
 			branch[p.Repo] = p.DefaultBranch
 		}
@@ -76,6 +91,9 @@ func BuildView(s *Store, now time.Time) View {
 			v.Merged++
 		}
 	}
+	v.ToReview = len(v.Review.Rows)
+	slices.SortFunc(v.Review.Rows, func(a, b Row) int { return byRepoThenNewest(a.Card, b.Card) })
+	slices.Sort(v.Review.Repos)
 	cards := chainCards(open, now)
 	v.Categories = groupBy(cards, merged, func(c Card) string { return c.Category })
 	slices.SortStableFunc(v.Categories, func(a, b Group) int {
@@ -101,7 +119,7 @@ func BuildView(s *Store, now time.Time) View {
 }
 
 func makeCard(p PR, now time.Time) Card {
-	return Card{Key: p.Key(), Repo: p.Repo, N: p.Number, URL: p.URL, Title: p.Title, Head: p.Head, Base: p.Base, Derived: Derive(p, now)}
+	return Card{Key: p.Key(), Repo: p.Repo, N: p.Number, URL: p.URL, Title: p.Title, Head: p.Head, Base: p.Base, Author: p.Author, Derived: Derive(p, now)}
 }
 
 // byRepoThenNewest orders cards by repository, then newest PR first.

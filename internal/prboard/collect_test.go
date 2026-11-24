@@ -63,6 +63,7 @@ func TestBuildQuery(t *testing.T) {
 // fakeGH answers gh search and gh api graphql from canned PRs.
 type fakeGH struct {
 	open, merged []searchHit
+	review       []searchHit // review-requested
 	prs          map[string]map[string]any // key -> pullRequest JSON
 	calls        []string
 }
@@ -92,6 +93,9 @@ func (f *fakeGH) run(ctx context.Context, dir, name string, args ...string) ([]b
 	case args[0] == "search":
 		if strings.Contains(strings.Join(args, " "), "--merged") {
 			return json.Marshal(f.merged)
+		}
+		if strings.Contains(strings.Join(args, " "), "--review-requested") {
+			return json.Marshal(f.review)
 		}
 		return json.Marshal(f.open)
 	case args[0] == "api" && args[1] == "graphql":
@@ -158,7 +162,7 @@ func TestCollectMerge(t *testing.T) {
 	if strings.Join(st.Cleaned, ",") != "acme/app#5" || !st.Refreshed.Equal(now) {
 		t.Errorf("cleaned %v refreshed %v", st.Cleaned, st.Refreshed)
 	}
-	if strings.Join(f.calls, ";") != "search prs;search prs;api graphql" {
+	if strings.Join(f.calls, ";") != "search prs;search prs;search prs;api graphql" {
 		t.Errorf("calls: %v", f.calls)
 	}
 }
@@ -196,7 +200,7 @@ func TestCollectRequired(t *testing.T) {
 	if len(st.Errors) != 0 {
 		t.Errorf("a target GitHub does not know is no page error: %v", st.Errors)
 	}
-	if strings.Join(f.calls, ";") != "search prs;search prs;api graphql;api graphql" {
+	if strings.Join(f.calls, ";") != "search prs;search prs;search prs;api graphql;api graphql" {
 		t.Errorf("calls: %v (one extra query for the two unknown targets)", f.calls)
 	}
 }
@@ -209,5 +213,47 @@ func TestCollectDiscoverError(t *testing.T) {
 	c.Cfg.Owners = []string{"acme"}
 	if _, err := c.Collect(context.Background(), nil); err == nil {
 		t.Fatal("want the gh error")
+	}
+}
+
+func TestCollectToReview(t *testing.T) {
+	reviewNode := func(n int, state, head string) map[string]any {
+		p := gqlNode("acme/app", n, state, head)
+		p["author"] = map[string]any{"login": "bob"}
+		p["body"] = "[required:acme/elsewhere#1]" // no lookup for a review
+		return p
+	}
+	f := &fakeGH{
+		open:   []searchHit{hit("acme/app", 1)},
+		merged: []searchHit{hit("acme/app", 2)},
+		// #1 is the author's own (a stale search hit); #3 open; #4 merged since the search
+		review: []searchHit{hit("acme/app", 1), hit("acme/app", 3), hit("acme/app", 4)},
+		prs: map[string]map[string]any{
+			"acme/app#1": gqlNode("acme/app", 1, "OPEN", "a"),
+			"acme/app#2": gqlNode("acme/app", 2, "MERGED", "b"),
+			"acme/app#3": reviewNode(3, "OPEN", "c"),
+			"acme/app#4": reviewNode(4, "MERGED", "d"),
+		},
+	}
+	// an old review that merged stays off the board, unlike the author's merged PRs
+	oldReview := openPR(5, "e", "main")
+	oldReview.State, oldReview.ToReview = "MERGED", true
+	c := Collector{Cfg: DefaultConfig(), Run: f.run, Now: func() time.Time { return now }}
+	c.Cfg.Owners = []string{"acme"}
+	st, err := c.Collect(context.Background(), &Store{PRs: []PR{oldReview}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, p := range st.PRs {
+		got = append(got, fmt.Sprintf("#%d review=%v author=%s requires=%d", p.Number, p.ToReview, p.Author, len(p.Requires)))
+	}
+	want := "#3 review=true author=bob requires=0;#2 review=false author= requires=0;#1 review=false author= requires=0"
+	if strings.Join(got, ";") != want {
+		t.Errorf("PRs:\n got %s\nwant %s", strings.Join(got, ";"), want)
+	}
+	// one review-requested search per owner, and the reviews share the batched query
+	if strings.Join(f.calls, ";") != "search prs;search prs;search prs;api graphql" {
+		t.Errorf("calls: %v", f.calls)
 	}
 }

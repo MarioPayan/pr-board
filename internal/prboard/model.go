@@ -34,6 +34,8 @@ type PR struct {
 	UpdatedAt      time.Time     `json:"updated_at"`
 	Body           string        `json:"body"`
 	Requires       []Requirement `json:"requires,omitempty"` // from [required:...] in the body; open PRs only
+	Author         string        `json:"author,omitempty"`
+	ToReview       bool          `json:"to_review,omitempty"` // someone else's open PR that asks the user for a review
 }
 
 // Review is one entry of latestReviews.

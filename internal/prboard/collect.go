@@ -57,36 +57,47 @@ type searchHit struct {
 	} `json:"repository"`
 }
 
-// Discover lists the author's open PRs and the ones merged in the window.
-func (c Collector) Discover(ctx context.Context) ([]ref, error) {
+// Discover lists the author's open PRs, the ones merged in the window and,
+// marked in toReview, the open PRs of others that request the author's
+// review. A PR the author wrote is never one to review.
+func (c Collector) Discover(ctx context.Context) (refs []ref, toReview map[ref]bool, err error) {
 	since := c.Now().AddDate(0, 0, -c.Cfg.MergedDays).Format("2006-01-02")
-	var out []ref
 	seen := map[ref]bool{}
+	toReview = map[ref]bool{}
 	for _, owner := range c.Cfg.Owners {
-		for _, extra := range [][]string{{"--state", "open"}, {"--merged", "--merged-at", ">=" + since}} {
-			args := append([]string{"search", "prs", "--author", c.Cfg.Author, "--owner", owner, "--json", "number,repository", "--limit", "200"}, extra...)
+		searches := [][]string{
+			{"--author", c.Cfg.Author, "--state", "open"},
+			{"--author", c.Cfg.Author, "--merged", "--merged-at", ">=" + since},
+			{"--review-requested", c.Cfg.Author, "--state", "open"},
+		}
+		for i, extra := range searches {
+			args := append([]string{"search", "prs", "--owner", owner, "--json", "number,repository", "--limit", "200"}, extra...)
 			b, err := c.Run(ctx, "", "gh", args...)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			var hits []searchHit
 			if err := json.Unmarshal(b, &hits); err != nil {
-				return nil, fmt.Errorf("gh search prs: %w", err)
+				return nil, nil, fmt.Errorf("gh search prs: %w", err)
 			}
 			for _, h := range hits {
 				r := ref{h.Repository.NameWithOwner, h.Number}
-				if r.Repo != "" && !seen[r] {
-					seen[r] = true
-					out = append(out, r)
+				if r.Repo == "" || seen[r] {
+					continue
+				}
+				seen[r] = true
+				refs = append(refs, r)
+				if i == len(searches)-1 {
+					toReview[r] = true
 				}
 			}
 		}
 	}
-	return out, nil
+	return refs, toReview, nil
 }
 
 const prFragment = `fragment F on PullRequest {
-  number title url isDraft state mergedAt baseRefName headRefName headRefOid
+  number title url isDraft state mergedAt baseRefName headRefName headRefOid author { login }
   mergeable mergeStateStatus reviewDecision updatedAt body
   headRepository { nameWithOwner }
   repository { nameWithOwner defaultBranchRef { name } }
@@ -127,7 +138,10 @@ type gqlPR struct {
 	ReviewDecision   string    `json:"reviewDecision"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 	Body             string    `json:"body"`
-	HeadRepository   *struct {
+	Author           *struct {
+		Login string `json:"login"`
+	} `json:"author"`
+	HeadRepository *struct {
 		NameWithOwner string `json:"nameWithOwner"`
 	} `json:"headRepository"`
 	Repository struct {
@@ -209,6 +223,9 @@ func (g gqlPR) toPR() PR {
 		Mergeable: g.Mergeable, MergeState: g.MergeStateStatus, ReviewDecision: g.ReviewDecision,
 		UpdatedAt: g.UpdatedAt, Body: g.Body,
 		Reviews: []Review{}, Requests: []string{}, ChecksFailing: []string{}, Threads: []Thread{},
+	}
+	if g.Author != nil {
+		p.Author = g.Author.Login
 	}
 	if g.HeadRepository != nil {
 		p.HeadRepo = g.HeadRepository.NameWithOwner
@@ -341,7 +358,7 @@ func (c Collector) resolveRequired(ctx context.Context, prs []PR, fetched []PR) 
 	var missing []ref
 	asked := map[string]bool{}
 	for i := range prs {
-		if prs[i].State != "OPEN" {
+		if prs[i].State != "OPEN" || prs[i].ToReview {
 			continue
 		}
 		prs[i].Requires = ParseRequired(prs[i].Body, prs[i].Repo, prs[i].Number)
@@ -390,7 +407,7 @@ func (c Collector) resolveRequired(ctx context.Context, prs []PR, fetched []PR) 
 // store: the cleaned list carries over, merged PRs stay until a
 // cleanup drops them, closed-unmerged PRs leave the map.
 func (c Collector) Collect(ctx context.Context, prev *Store) (*Store, error) {
-	refs, err := c.Discover(ctx)
+	refs, toReview, err := c.Discover(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -414,15 +431,16 @@ func (c Collector) Collect(ctx context.Context, prev *Store) (*Store, error) {
 	}
 	have := map[string]bool{}
 	for _, p := range prs {
-		if p.State == "CLOSED" {
-			continue
+		p.ToReview = toReview[ref{p.Repo, p.Number}]
+		if p.State == "CLOSED" || p.ToReview && p.State != "OPEN" {
+			continue // a review that is no longer open leaves the board
 		}
 		have[p.Key()] = true
 		next.PRs = append(next.PRs, p)
 	}
 	if prev != nil {
 		for _, p := range prev.PRs {
-			if p.State == "MERGED" && !have[p.Key()] && !cleaned[p.Key()] {
+			if p.State == "MERGED" && !p.ToReview && !have[p.Key()] && !cleaned[p.Key()] {
 				have[p.Key()] = true
 				next.PRs = append(next.PRs, p)
 			}

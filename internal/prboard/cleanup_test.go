@@ -298,3 +298,14 @@ func TestCleanupFetchesMissingPRHead(t *testing.T) {
 		}
 	}
 }
+
+func TestCleanupSkipsReviews(t *testing.T) {
+	c := Cleaner{Now: time.Now, Run: func(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
+		t.Errorf("unexpected %s %v", name, args)
+		return nil, errServer
+	}}
+	p := PR{Repo: "acme/widgets", Number: 3, State: "MERGED", Head: "theirs", HeadRepo: "acme/widgets", DefaultBranch: "main", ToReview: true}
+	if items := c.Plan(context.Background(), []PR{p}); len(items) != 0 {
+		t.Errorf("a review must never be cleaned up: %+v", items)
+	}
+}

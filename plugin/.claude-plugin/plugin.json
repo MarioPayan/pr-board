@@ -1,6 +1,6 @@
 {
   "name": "pr-board",
-  "version": "0.3.0",
-  "description": "Keeps the local pr-board server alive while a Claude session runs.",
+  "version": "0.4.0",
+  "description": "Keeps the local pr-board server alive while a Claude session runs, and wires its statusline segment.",
   "author": { "name": "Mario Payan" }
 }

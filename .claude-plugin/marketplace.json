@@ -5,7 +5,7 @@
     {
       "name": "pr-board",
       "source": "./plugin",
-      "description": "Session check-ins for the local pr-board server."
+      "description": "Session check-ins for the local pr-board server, and its statusline segment."
     }
   ]
 }

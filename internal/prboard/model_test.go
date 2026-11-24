@@ -91,9 +91,9 @@ func TestDerive(t *testing.T) {
 		{"no checks at all", func(p *PR) { p.ChecksTotal = 0 }, StReady, "Ready to merge", "approved", "merge"},
 		{"unresolved threads and stale", func(p *PR) {
 			p.Threads = []Thread{{}, {}, {}}
-			p.UpdatedAt = now.AddDate(0, 0, -10)
-		}, StReady, "Ready to merge", "ci_pass approved threads(3) stale(10)", "merge"},
-		{"seven days is not stale", func(p *PR) { p.UpdatedAt = now.AddDate(0, 0, -7) }, StReady, "Ready to merge", "ci_pass approved", "merge"},
+			p.UpdatedAt = now.AddDate(0, 0, -11)
+		}, StReady, "Ready to merge", "ci_pass approved threads(3) stale(11)", "merge"},
+		{"ten days is not stale", func(p *PR) { p.UpdatedAt = now.AddDate(0, 0, -10) }, StReady, "Ready to merge", "ci_pass approved", "merge"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -128,7 +128,7 @@ func TestSignalOrder(t *testing.T) {
 		p.Requests = []string{"carol"}
 		p.Mergeable, p.MergeState = "CONFLICTING", "BEHIND"
 		p.Threads = []Thread{{}}
-		p.UpdatedAt = now.AddDate(0, 0, -9)
+		p.UpdatedAt = now.AddDate(0, 0, -12)
 		p.Requires = []Requirement{{Repo: "acme/app", N: 2, State: "MERGED"}, {Repo: "acme/app", N: 3, State: "OPEN"}}
 	}
 	cases := []struct {
@@ -137,7 +137,7 @@ func TestSignalOrder(t *testing.T) {
 		want string
 	}{
 		{"everything at once", everything,
-			"ci_fail(1) ci_pend(2) changes dismissed rev conflict behind req_open req_done threads(1) stale(9)"},
+			"ci_fail(1) ci_pend(2) changes dismissed rev conflict behind req_open req_done threads(1) stale(12)"},
 		{"approved, rule, requirement and no reviewer slot", func(p *PR) {
 			p.MergeState = "BLOCKED"
 			p.Threads = []Thread{{}, {}}

@@ -53,7 +53,7 @@ The signals always come in the same order, so each one sits in the same place on
 | Branch rule | a shield with a cross: approved and green, but a rule still blocks the merge |
 | Required PRs | a left chevron and `after #412` or `after repo#90`, for requirements that are not a chain (see below) |
 | Threads | a speech bubble and the count of unresolved threads |
-| Stale | an hourglass and the days since the last update, after 7 |
+| Stale | an hourglass and the days since the last update, after 10 |
 
 ### Filters
 

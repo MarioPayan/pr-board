@@ -108,7 +108,8 @@ type Derived struct {
 	Draft    bool     `json:"draft,omitempty"` // shown as a tag and a dashed border, not a signal
 }
 
-const staleDays = 7
+// staleDays is how many days without an update make a PR stale.
+const staleDays = 10
 
 func (p PR) approved() bool {
 	if p.ReviewDecision == "APPROVED" {

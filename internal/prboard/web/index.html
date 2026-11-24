@@ -218,7 +218,7 @@ html,body{margin:0;background:var(--bg)}
     ["approve","amber","Ready to approve","Everything is in place except an approval."],
     ["missing","red","Something missing","Draft, CI failing or running, conflicts, behind, changes requested, a branch rule or a required PR still open. The icons say which."]
   ];
-  // every signal kind in the fixed card order: [icon, colour, meaning, letters, legend sample]
+  // every signal kind in the fixed card order: [icon, colour, meaning, letters, legend sample, legend note]
   const K={
     ci_fail:["x","k-bad","CI jobs failing","CI",{n:2}], ci_pend:["timer","k-warn","CI jobs running","CI",{n:3}], ci_pass:["check","k-ok","CI green","CI"],
     approved:["check","k-ok","Approved","RV"], changes:["x","k-bad","Changes requested","RV"], dismissed:["undo","k-warn","Approval dismissed","RV"],
@@ -226,7 +226,7 @@ html,body{margin:0;background:var(--bg)}
     conflict:["mergex","k-bad","Merge conflicts"], behind:["sync","k-warn","Behind the base branch"], blocked:["shield","k-warn","A branch rule blocks the merge"],
     req_open:["after","k-warn","Required PR still open","",{x:"after #412"}], req_closed:["after","k-bad","Required PR closed without merging","",{x:"after repo#90"}],
     req_unknown:["after","k-warn","Required PR not found","",{x:"after repo#90"}], req_done:["after","k-ok","Required PR merged","",{x:"after repo#90"}],
-    threads:["chat","k-warn","Unresolved review threads","",{n:3}], stale:["sand","k-warn","Days without an update","",{n:12}]
+    threads:["chat","k-warn","Unresolved review threads","",{n:3}], stale:["sand","k-warn","Days without an update","",{n:12},"Shown after 10 days."]
   };
   const NONE="~none";
   const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -236,7 +236,7 @@ html,body{margin:0;background:var(--bg)}
 
   $("pb-colours").innerHTML=STATES.map(s=>`<li><span class="bar" style="background:var(--${s[1]})"></span><span>${esc(s[2])}</span><small>${esc(s[3])}</small></li>`).join("")+
     `<li><span class="bar" style="background:var(--purple)"></span><span>Merged</span><small>Folded at the end of its group until Clean up removes it; Show merged lists them.</small></li>`;
-  $("pb-icons").innerHTML=Object.entries(K).map(([k,v])=>`<li>${ic(k,v[4]&&v[4].n,"",v[4]&&v[4].x)}<span>${esc(v[2])}</span></li>`).join("")+
+  $("pb-icons").innerHTML=Object.entries(K).map(([k,v])=>`<li>${ic(k,v[4]&&v[4].n,"",v[4]&&v[4].x)}<span>${esc(v[2])}</span>${v[5]?`<small>${esc(v[5])}</small>`:""}</li>`).join("")+
     `<li><span class="ic k-info more" data-name="More">+2</span><span>Signals that do not fit</span><small>The tooltip lists them.</small></li>`+
     `<li><span class="tag">DRAFT</span><span>Draft</span><small>Next to the number; the row's left bar is dashed.</small></li>`+
     `<li><span class="dash"></span><span>Dashed left bar</span><small>The PR is a draft.</small></li>`;

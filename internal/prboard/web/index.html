@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Space+Grotesk:wght@600&display=swap">
+<style>
+:root{--bg:#f4f5f8;--surface:#fff;--fg:#1a2030;--muted:#5f6778;--line:#d9dde5;--trunk:#3a4256;--shade:rgba(15,20,30,.38);
+  --green:#1e8a4c;--amber:#a87406;--red:#c2352b;--purple:#7a4bd1;--focus:#2f62d0;
+  --display:"Space Grotesk",system-ui,sans-serif;--body:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;
+  color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#11141a;--surface:#1a1e26;--fg:#e5e8ee;--muted:#9aa2b1;--line:#2c323d;--trunk:#aab3c5;--shade:rgba(0,0,0,.55);
+  --green:#4fcf86;--amber:#e8b44a;--red:#ff7b70;--purple:#b08cff;--focus:#7ea2ff}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg)}
+#app{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.45;padding:20px;min-height:100vh;container-type:inline-size}
+#app a{color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.pb-top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-bottom:12px}
+.pb-top h1{font-family:var(--display);font-size:1.5rem;margin:0}
+.pb-top .when{color:var(--muted);font-size:.85rem}
+.pb-top .sp{flex:1}
+.pb-btn{font:600 .85rem var(--body);border:1px solid var(--line);color:var(--fg);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer}
+.pb-btn.pur{border-color:var(--purple);color:var(--purple)}
+.pb-btn:disabled{opacity:.45;cursor:default}
+.pb-btn.solid{background:var(--purple);border-color:var(--purple);color:#fff}
+.pb-icon{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);cursor:pointer}
+.pb-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.pb-clean{background:var(--surface);border:1px solid var(--purple);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:.88rem;display:grid;gap:8px}
+.pb-clean ul{margin:0;padding-left:1.1rem}
+.pb-clean .row{display:flex;gap:8px;flex-wrap:wrap}
+.pb-clean .plan{max-height:340px;overflow:auto;border-top:1px solid var(--line);padding-top:8px;display:grid;gap:6px}
+.pb-clean .plan li{margin:1px 0}
+.pb-clean .skip{color:var(--muted)}
+.pb-clean .fail{color:var(--red)}
+.pb-err{background:color-mix(in srgb,var(--red) 10%,var(--surface));border:1px solid var(--red);color:var(--fg);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.85rem}
+.pb-setup{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 18px;max-width:640px}
+.pb-setup h2{font:600 1.05rem var(--display);margin:0 0 6px}
+.pb-setup p{margin:6px 0}
+.pb-setup code,.pb-setup pre{font:500 .82rem var(--mono)}
+.pb-setup pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;overflow:auto;margin:8px 0}
+
+/* filter bar */
+.pb-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px;margin-bottom:18px;background:var(--surface);border:1px solid var(--line);border-radius:8px;font-size:.85rem}
+.pb-q{flex:0 1 260px;min-width:160px;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 9px;height:32px}
+.pb-dd{position:relative}
+.pb-dd>summary{list-style:none;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid var(--line);border-radius:6px;cursor:pointer;font-weight:600;user-select:none;white-space:nowrap}
+.pb-dd>summary::-webkit-details-marker{display:none}
+.pb-dd>summary::after{content:"";width:6px;height:6px;border:solid var(--muted);border-width:0 1.5px 1.5px 0;transform:translateY(-2px) rotate(45deg)}
+.pb-dd[open]>summary{border-color:var(--focus)}
+.pb-dd .n{font:600 .72rem var(--mono);background:var(--fg);color:var(--surface);border-radius:999px;padding:0 6px;line-height:16px}
+.pb-dd .menu{position:absolute;z-index:5;top:calc(100% + 4px);left:0;min-width:210px;max-height:320px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.14);display:grid}
+.pb-dd label{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:5px;cursor:pointer;white-space:nowrap}
+.pb-dd label:hover{background:var(--bg)}
+.pb-dd .sw{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+.pb-tog{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 6px;cursor:pointer;font-weight:600;white-space:nowrap}
+.pb-bar .sp{flex:1}
+.pb-count{color:var(--muted);white-space:nowrap}
+.pb-clear{font:600 .85rem var(--body);color:var(--focus);background:none;border:0;padding:0 4px;cursor:pointer;text-decoration:underline}
+
+/* legend drawer */
+.pb-shade{position:fixed;inset:0;background:var(--shade);z-index:20}
+.pb-drawer{position:fixed;top:0;right:0;bottom:0;width:360px;max-width:100%;z-index:21;background:var(--surface);color:var(--fg);border-left:1px solid var(--line);box-shadow:-12px 0 32px rgba(0,0,0,.18);overflow:auto;padding:16px 18px 24px;font-family:var(--body);font-size:14px;line-height:1.45}
+.pb-drawer:not([hidden]){animation:pb-in .18s ease-out}
+@keyframes pb-in{from{transform:translateX(24px);opacity:0}}
+@media (prefers-reduced-motion:reduce){.pb-drawer:not([hidden]){animation:none}}
+@media (max-width:480px){.pb-drawer{width:100%;border-left:0}}
+.pb-drawer .dh{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.pb-drawer h2{font:600 1.2rem var(--display);margin:0}
+.pb-drawer h3{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 8px}
+.pb-drawer ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.pb-drawer li{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:start;font-size:.86rem}
+.pb-drawer li small{grid-column:2;color:var(--muted);font-size:.8rem}
+.pb-drawer .sw{width:14px;height:14px;border-radius:3px;margin-top:3px}
+.pb-drawer .ln{width:26px;height:2px;background:var(--trunk);margin-top:10px}
+.pb-drawer .ic{justify-self:start}
+
+/* board */
+.repos{display:grid;gap:24px}
+.empty{color:var(--muted)}
+.branch{display:inline-flex;flex-direction:column;border:2px solid var(--trunk);border-radius:8px;padding:6px 12px;background:var(--surface)}
+.branch small{color:var(--muted);font-size:.75rem}
+.branch b{font-family:var(--mono);font-size:.95rem}
+.lanes{position:relative;margin-left:22px;border-left:3px solid var(--trunk);padding:14px 0 6px;display:grid;gap:10px}
+.lanes::before{content:"";position:absolute;left:-9px;top:-1px;border:7.5px solid transparent;border-bottom:10px solid var(--trunk);border-top:0}
+.lane{display:flex;align-items:center;min-width:0;overflow-x:auto}
+.conn{flex:0 0 34px;height:2px;background:var(--trunk);position:relative}
+.conn::before{content:"";position:absolute;left:-1px;top:-5px;border:6px solid transparent;border-right:8px solid var(--trunk);border-left:0}
+.ref{font:600 .8rem var(--mono);color:var(--muted);border:1px dashed var(--line);border-radius:6px;padding:2px 6px;margin-left:10px;flex:0 0 auto}
+.pr{--c:var(--muted);flex:1 1 300px;max-width:520px;min-width:230px;background:color-mix(in srgb,var(--c) 9%,var(--surface));border:1px solid color-mix(in srgb,var(--c) 35%,var(--line));border-left:5px solid var(--c);border-radius:7px;padding:9px 12px;display:grid;grid-template-columns:minmax(0,1fr);gap:6px;transition:opacity .15s}
+.pr>*{height:22px;min-width:0;overflow:hidden;white-space:nowrap}
+.pr.ready{--c:var(--green)}.pr.approve{--c:var(--amber)}.pr.missing{--c:var(--red)}.pr.merged{--c:var(--purple)}
+.pr.dim{opacity:.38}
+.hd{display:flex;align-items:center;gap:8px}
+.hd>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.num{font:600 .9rem var(--mono);flex:0 0 auto}
+.st{font-size:.72rem;font-weight:600;color:var(--c);text-transform:uppercase;letter-spacing:.05em;flex:0 1 auto}
+.base{font:500 .72rem var(--mono);color:var(--muted);flex:0 1 auto}
+.cat{font-size:.72rem;line-height:18px;border:1px solid var(--line);border-radius:999px;padding:0 7px;color:var(--muted);margin-left:auto;flex:0 1 auto}
+.ttl{font-weight:600;line-height:22px;text-overflow:ellipsis}
+.sig{display:flex;flex-wrap:nowrap;align-items:center;gap:4px}
+.ic{display:inline-flex;flex:0 0 auto;align-items:center;gap:3px;height:22px;font:600 .78rem var(--mono);padding:0 6px;border-radius:6px;color:var(--k);background:color-mix(in srgb,var(--k) 13%,transparent);cursor:default;white-space:nowrap}
+.ic svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.k-ok{--k:var(--green)}.k-bad{--k:var(--red)}.k-warn{--k:var(--amber)}.k-info{--k:var(--muted)}
+.next{font-size:.84rem;line-height:22px;color:var(--muted);text-overflow:ellipsis}
+.next b{color:var(--fg);font-weight:600}
+.lane.m{display:none}
+.lanes.open .lane.m{display:flex}
+.fold{font:600 .82rem var(--body);color:var(--purple);background:none;border:0;padding:0 0 0 34px;cursor:pointer;justify-self:start}
+.pr.merged .ttl{color:var(--muted);font-weight:500}
+@container (max-width:600px){#app{padding:14px}.conn{flex-basis:20px}.pr{min-width:210px}.pb-q{flex:1 1 100%}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M7 11v9H4v-9zM7 11l4-8c1.5 0 2.5 1 2.2 2.6L12.5 10H19a2 2 0 0 1 2 2.3l-1.4 6.4A2 2 0 0 1 17.6 20H7"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><g transform="rotate(180 12 12)"><path d="M7 11v9H4v-9zM7 11l4-8c1.5 0 2.5 1 2.2 2.6L12.5 10H19a2 2 0 0 1 2 2.3l-1.4 6.4A2 2 0 0 1 17.6 20H7"/></g></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-behind" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M7 3c0 6 10 6 10 9s-10 3-10 9M17 3c0 6-10 6-10 9s10 3 10 9"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+</svg>
+
+<div id="app">
+  <div class="pb-top">
+    <h1>PR Board</h1>
+    <span class="when" id="pb-when">loading…</span>
+    <span class="sp"></span>
+    <button class="pb-icon" id="pb-legend-btn" type="button" aria-label="Legend" aria-haspopup="dialog" aria-expanded="false" aria-controls="pb-legend" title="Legend"><svg aria-hidden="true"><use href="#i-info"/></svg></button>
+    <button class="pb-btn" id="pb-refresh" type="button">Refresh</button>
+    <button class="pb-btn pur" id="pb-cleanup" type="button" disabled>Clean up</button>
+  </div>
+  <div class="pb-clean" id="pb-cleanbox" hidden></div>
+  <div class="pb-err" id="pb-err" hidden></div>
+  <div class="pb-bar" id="pb-bar" role="search" aria-label="Filter PRs" hidden>
+    <input class="pb-q" id="pb-q" type="search" placeholder="Search number, title, branch" aria-label="Search number, title or branch" autocomplete="off">
+    <details class="pb-dd" data-f="repo"><summary>Repo <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="Repo"></div></details>
+    <details class="pb-dd" data-f="state"><summary>State <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="State"></div></details>
+    <details class="pb-dd" data-f="cat"><summary>Category <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="Category"></div></details>
+    <label class="pb-tog"><input type="checkbox" id="pb-merged"> Show merged</label>
+    <span class="sp"></span>
+    <button class="pb-clear" id="pb-clear" type="button" hidden>Clear</button>
+    <span class="pb-count" id="pb-count" aria-live="polite"></span>
+  </div>
+  <div class="repos" id="pb-repos"></div>
+</div>
+
+<div class="pb-shade" id="pb-shade" hidden></div>
+<aside class="pb-drawer" id="pb-legend" role="dialog" aria-modal="true" aria-labelledby="pb-legend-h" tabindex="-1" hidden>
+  <div class="dh"><h2 id="pb-legend-h">Legend</h2><button class="pb-icon" id="pb-legend-close" type="button" aria-label="Close legend"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <h3>Colours</h3>
+  <ul id="pb-colours"></ul>
+  <h3>Icons</h3>
+  <ul id="pb-icons"></ul>
+  <h3>Links</h3>
+  <ul>
+    <li><span class="ln"></span><span>Stacked on, or required first</span><small>The card on the left is the PR whose branch is this one's base, or a PR its description names in <code>[required:#N]</code>.</small></li>
+    <li><span class="ref">#N</span><span>Branches off #N</span><small>A second PR that follows the same card starts its own lane.</small></li>
+  </ul>
+</aside>
+
+<script>
+(function(){
+  "use strict";
+  const STATES=[
+    ["ready","green","Ready to merge","Approved, every check passed, mergeable, not behind, nothing required first."],
+    ["approve","amber","Ready to approve","Everything is in place except an approval."],
+    ["missing","red","Something missing","Draft, CI failing or running, conflicts, behind, changes requested, a branch rule or a required PR still open. The icons say which."]
+  ];
+  const K={
+    ci_pass:["check","k-ok","CI green"], ci_fail:["x","k-bad","CI jobs failing"], ci_pend:["clock","k-warn","CI jobs running"],
+    approved:["up","k-ok","Approved"], changes:["down","k-bad","Changes requested"], dismissed:["undo","k-warn","Review dismissed"],
+    norev:["eye","k-warn","No reviewer requested"], rev:["user","k-info","Review requested"],
+    conflict:["bolt","k-bad","Merge conflicts"], behind:["behind","k-warn","Behind the base branch"], blocked:["lock","k-warn","A branch rule blocks the merge"],
+    threads:["chat","k-warn","Unresolved review threads"], draft:["pen","k-info","Draft"], stale:["sleep","k-warn","Days without an update"],
+    req_open:["lock","k-warn","Required PR still open"], req_done:["lock","k-ok","Required PR merged"],
+    req_closed:["lock","k-bad","Required PR closed without merging"], req_unknown:["lock","k-warn","Required PR not found"]
+  };
+  const NONE="~none";
+  const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const safeURL=u=>/^https:\/\/github\.com\//.test(u||"")?u:"#";
+  const $=id=>document.getElementById(id);
+  const ic=(k,n,t,x)=>{const d=K[k];if(!d)return"";return `<span class="ic ${d[1]}" title="${esc(t||d[2])}"><svg aria-hidden="true"><use href="#i-${d[0]}"/></svg>${n?esc(n):""}${x?esc(x):""}</span>`};
+
+  $("pb-colours").innerHTML=STATES.map(s=>`<li><span class="sw" style="background:var(--${s[1]})"></span><span>${esc(s[2])}</span><small>${esc(s[3])}</small></li>`).join("")+
+    `<li><span class="sw" style="background:var(--purple)"></span><span>Merged</span><small>Folded under the trunk until Clean up removes it.</small></li>`;
+  $("pb-icons").innerHTML=Object.entries(K).map(([k,v])=>`<li>${ic(k)}<span>${esc(v[2])}</span></li>`).join("");
+
+  // ---- legend drawer
+  const drawer=$("pb-legend"),shade=$("pb-shade"),legendBtn=$("pb-legend-btn");
+  function openLegend(){drawer.hidden=false;shade.hidden=false;legendBtn.setAttribute("aria-expanded","true");$("pb-legend-close").focus()}
+  function closeLegend(){if(drawer.hidden)return;drawer.hidden=true;shade.hidden=true;legendBtn.setAttribute("aria-expanded","false");legendBtn.focus()}
+  legendBtn.addEventListener("click",openLegend);
+  $("pb-legend-close").addEventListener("click",closeLegend);
+  shade.addEventListener("click",closeLegend);
+  document.addEventListener("keydown",e=>{
+    if(drawer.hidden)return;
+    if(e.key==="Escape"){e.preventDefault();closeLegend();return}
+    if(e.key==="Tab"){ // keep focus inside the drawer
+      const f=[...drawer.querySelectorAll("button,a[href],input")];
+      if(!f.length)return;
+      const first=f[0],last=f[f.length-1];
+      if(!drawer.contains(document.activeElement)){e.preventDefault();first.focus()}
+      else if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}
+    }
+  });
+
+  // ---- cards
+  // every open card has the same four rows (header, title, signals, next) and
+  // merged cards the first two, so cards of a kind always share one height
+  const card=(c,repo)=>{
+    const open=c.state!=="merged";
+    const text=`#${c.n} ${c.title} ${c.head||""}`.toLowerCase();
+    return `<article class="pr ${esc(c.state)}" data-n="${esc(c.n)}" data-repo="${esc(repo)}" data-state="${esc(c.state)}" data-cat="${esc(c.category||NONE)}" data-text="${esc(text)}"><div class="hd"><a class="num" href="${esc(safeURL(c.url))}" target="_blank" rel="noopener">#${esc(c.n)}</a><span class="st" title="${esc(c.label)}">${esc(c.label)}</span>${c.base?`<span class="base" title="Base branch ${esc(c.base)}">on ${esc(c.base)}</span>`:""}${c.category?`<span class="cat" title="Category: ${esc(c.category)}">${esc(c.category)}</span>`:""}</div>
+    <div class="ttl" title="${esc(c.title)}">${esc(c.title)}</div>${open?`<div class="sig">${(c.signals||[]).map(s=>ic(s.k,s.n,s.title,s.text)).join("")}</div>
+    <div class="next" title="${esc(c.next||"")}">${c.next?`<b>Next:</b> ${esc(c.next)}`:""}</div>`:""}</article>`;
+  };
+  // a signals row never wraps: icons that do not fit fold into a "+N" chip
+  function fitSignals(root){
+    root.querySelectorAll(".sig").forEach(row=>{
+      row.querySelectorAll(".more").forEach(m=>m.remove());
+      const icons=[...row.children];
+      icons.forEach(i=>i.hidden=false);
+      if(!row.clientWidth||row.scrollWidth<=row.clientWidth)return;
+      const more=document.createElement("span");
+      more.className="ic k-info more";
+      row.appendChild(more);
+      const hidden=[];
+      for(let i=icons.length-1;i>=0;i--){
+        icons[i].hidden=true;hidden.unshift(icons[i]);
+        more.textContent="+"+hidden.length;
+        more.title=hidden.map(h=>h.title).join("\n");
+        if(row.scrollWidth<=row.clientWidth)break;
+      }
+    });
+  }
+  const item=(it,repo)=>it.card?card(it.card,repo):it.ref?`<span class="ref" title="Follows ${esc(it.ref)}">${esc(it.ref)}</span>`:`<div class="conn" title="${it.link==="required"?"Required first":"Stacked on"}"></div>`;
+  const lane=(items,repo,cls,group)=>`<div class="lane ${cls||""}"${group!=null?` data-group="${group}"`:""}>${items[0]&&items[0].ref?"":`<div class="conn"></div>`}${items.map(it=>item(it,repo)).join("")}</div>`;
+
+  // lanes that hang off a card in another lane ("#N" reference) form one
+  // chain with it; a chain is shown whole when any of its PRs matches
+  function groups(lanes){
+    const parent=lanes.map((_,i)=>i);
+    const find=i=>parent[i]===i?i:(parent[i]=find(parent[i]));
+    const where={};
+    lanes.forEach((l,i)=>l.forEach(it=>{if(it.card)where[it.card.n]=i}));
+    lanes.forEach((l,i)=>l.forEach(it=>{
+      const m=it.ref&&/^#(\d+)$/.exec(it.ref);
+      if(m&&where[m[1]]!=null)parent[find(i)]=find(where[m[1]]);
+    }));
+    return lanes.map((_,i)=>find(i));
+  }
+
+  // ---- filters, kept in location.hash: #q=..&repo=a,b&state=..&cat=..&merged=1
+  const f={q:"",repo:new Set(),state:new Set(),cat:new Set(),merged:false};
+  const LISTS=["repo","state","cat"];
+  function readHash(){
+    const h=location.hash.replace(/^#/,"");
+    f.q="";f.merged=false;LISTS.forEach(k=>f[k]=new Set());
+    for(const part of h.split("&")){
+      if(!part)continue;
+      const i=part.indexOf("="),k=i<0?part:part.slice(0,i),v=i<0?"":part.slice(i+1);
+      const dec=s=>{try{return decodeURIComponent(s.replace(/\+/g," "))}catch(e){return s}};
+      if(k==="q")f.q=dec(v);
+      else if(k==="merged")f.merged=v==="1";
+      else if(LISTS.includes(k))v.split(",").filter(Boolean).forEach(x=>f[k].add(dec(x)));
+    }
+  }
+  function hashString(){
+    const parts=[];
+    if(f.q)parts.push("q="+encodeURIComponent(f.q));
+    LISTS.forEach(k=>{if(f[k].size)parts.push(k+"="+[...f[k]].map(encodeURIComponent).join(","))});
+    if(f.merged)parts.push("merged=1");
+    return parts.join("&");
+  }
+  function writeHash(){
+    const h=hashString();
+    history.replaceState(null,"",h?"#"+h:location.pathname+location.search);
+  }
+  const active=()=>!!(f.q||f.merged||LISTS.some(k=>f[k].size));
+
+  function syncControls(){
+    if($("pb-q").value!==f.q)$("pb-q").value=f.q;
+    $("pb-merged").checked=f.merged;
+    document.querySelectorAll(".pb-dd").forEach(dd=>{
+      const k=dd.dataset.f;
+      dd.querySelectorAll("input").forEach(i=>i.checked=f[k].has(i.value));
+      const n=dd.querySelector(".n");n.hidden=!f[k].size;n.textContent=f[k].size;
+    });
+    $("pb-clear").hidden=!active();
+  }
+  let menuKey="";
+  function buildMenus(opts){
+    const key=JSON.stringify(opts);
+    if(key===menuKey)return;
+    menuKey=key;
+    const box=(k,v,label,sw)=>`<label><input type="checkbox" value="${esc(v)}">${sw?`<span class="sw" style="background:var(--${sw})"></span>`:""}${esc(label)}</label>`;
+    document.querySelector('.pb-dd[data-f="repo"] .menu').innerHTML=opts.repos.map(r=>box("repo",r,r)).join("");
+    document.querySelector('.pb-dd[data-f="state"] .menu').innerHTML=STATES.map(s=>box("state",s[0],s[2],s[1])).join("");
+    document.querySelector('.pb-dd[data-f="cat"] .menu').innerHTML=opts.cats.map(c=>box("cat",c,c)).join("")+box("cat",NONE,"No category");
+  }
+  const matches=(el,useState)=>
+    (!f.q||el.dataset.text.includes(f.q.toLowerCase().trim()))&&
+    (!f.repo.size||f.repo.has(el.dataset.repo))&&
+    (!useState||!f.state.size||f.state.has(el.dataset.state))&&
+    (!f.cat.size||f.cat.has(el.dataset.cat));
+
+  function apply(){
+    let shown=0,total=0,anyRepo=false;
+    document.querySelectorAll("#pb-repos section.repo").forEach(sec=>{
+      const byGroup={};
+      sec.querySelectorAll(".lane:not(.m)").forEach(l=>{
+        const g=l.dataset.group;
+        l.querySelectorAll(".pr").forEach(c=>{
+          const m=matches(c,true);
+          c._m=m;total++;if(m)shown++;
+          if(m)byGroup[g]=true;
+        });
+      });
+      let visible=0;
+      sec.querySelectorAll(".lane:not(.m)").forEach(l=>{
+        const on=!!byGroup[l.dataset.group];
+        l.hidden=!on;if(on)visible++;
+        l.querySelectorAll(".pr").forEach(c=>c.classList.toggle("dim",on&&!c._m));
+      });
+      // merged PRs ignore the State filter: Show merged is their switch
+      let mergedShown=0;
+      sec.querySelectorAll(".lane.m").forEach(l=>{
+        const on=f.merged&&matches(l.querySelector(".pr"),false);
+        l.hidden=!on;if(on)mergedShown++;
+      });
+      const fold=sec.querySelector(".fold");
+      if(fold){
+        fold.hidden=!mergedShown;
+        fold.textContent=`${mergedShown} merged ${sec.querySelector(".lanes").classList.contains("open")?"▾":"▸"}`;
+      }
+      sec.hidden=!visible&&!mergedShown;
+      if(!sec.hidden)anyRepo=true;
+    });
+    $("pb-count").textContent=`Showing ${shown} of ${total} open`;
+    $("pb-nomatch")&&($("pb-nomatch").hidden=anyRepo||!total&&!f.merged);
+    syncControls();
+    fitSignals($("pb-repos"));
+  }
+  function changed(){writeHash();apply()}
+
+  $("pb-q").addEventListener("input",e=>{f.q=e.target.value;changed()});
+  $("pb-merged").addEventListener("change",e=>{f.merged=e.target.checked;changed()});
+  document.querySelectorAll(".pb-dd").forEach(dd=>{
+    dd.addEventListener("change",e=>{
+      const k=dd.dataset.f,i=e.target;
+      i.checked?f[k].add(i.value):f[k].delete(i.value);
+      changed();
+    });
+    dd.addEventListener("toggle",()=>{if(dd.open)document.querySelectorAll(".pb-dd[open]").forEach(o=>{if(o!==dd)o.open=false})});
+  });
+  document.addEventListener("click",e=>document.querySelectorAll(".pb-dd[open]").forEach(o=>{if(!o.contains(e.target))o.open=false}));
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".pb-dd[open]").forEach(o=>{o.open=false;o.querySelector("summary").focus()})});
+  $("pb-clear").addEventListener("click",()=>{f.q="";f.merged=false;LISTS.forEach(k=>f[k].clear());changed();$("pb-q").focus()});
+  window.addEventListener("hashchange",()=>{readHash();apply()});
+
+  // ---- render
+  const openRepos=new Set();
+  let view=null;
+  function setupHTML(path){
+    return `<div class="pb-setup"><h2>Set up PR Board</h2>
+      <p>List the GitHub users or organizations whose pull requests you author in <code>${esc(path)}</code>:</p>
+      <pre>"owners": ["your-org", "your-username"]</pre>
+      <p>The next refresh picks it up; press Refresh when you have saved the file.</p></div>`;
+  }
+  function render(v){
+    view=v;
+    const t=v.refreshed&&!v.refreshed.startsWith("0001")?new Date(v.refreshed).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"never";
+    $("pb-when").textContent=`${v.open} open · ${v.merged} merged · refreshed ${t}`;
+    const btn=$("pb-cleanup");
+    btn.disabled=!v.merged; btn.textContent=v.merged?`Clean up ${v.merged} merged`:"Nothing to clean up";
+    const err=$("pb-err"); err.hidden=!(v.errors&&v.errors.length); err.textContent=(v.errors||[]).join(" · ");
+    const repos=v.repos||[];
+    $("pb-bar").hidden=!!v.setup||!repos.length;
+    if(v.setup){$("pb-repos").innerHTML=setupHTML(v.setup);return}
+    // a repo goes by its name, or owner/name when two owners share a name
+    const names={};
+    repos.forEach(r=>{const n=r.repo.split("/").pop();names[n]=(names[n]||0)+1});
+    const short=r=>{const n=r.split("/").pop();return names[n]>1?r:n};
+    const cats=new Set();
+    repos.forEach(r=>{(r.lanes||[]).forEach(l=>l.forEach(it=>{if(it.card&&it.card.category)cats.add(it.card.category)}));(r.merged||[]).forEach(m=>{if(m.category)cats.add(m.category)})});
+    buildMenus({repos:repos.map(r=>short(r.repo)).sort(),cats:[...cats].sort((a,b)=>a.localeCompare(b))});
+    $("pb-repos").innerHTML=repos.length?repos.map(r=>{
+      const s=short(r.repo),g=groups(r.lanes||[]);
+      return `<section class="repo" data-repo="${esc(r.repo)}"><div class="branch"><small>${esc(r.repo)}</small><b>${esc(r.branch||"?")}</b></div>
+      <div class="lanes${openRepos.has(r.repo)?" open":""}">${(r.lanes||[]).map((l,i)=>lane(l,s,"",g[i])).join("")}${(r.merged||[]).map(m=>lane([{card:m}],s,"m")).join("")}${r.merged&&r.merged.length?`<button class="fold" type="button"></button>`:""}</div></section>`;
+    }).join("")+`<p class="empty" id="pb-nomatch" hidden>No PR matches these filters. <button class="pb-clear" type="button" data-clear>Clear</button></p>`
+      :`<p class="empty">No PRs yet. Refresh runs on start and every 5 minutes.</p>`;
+    document.querySelectorAll("#pb-repos .fold").forEach(b=>b.addEventListener("click",()=>{
+      const l=b.parentElement,repo=l.parentElement.dataset.repo,open=l.classList.toggle("open");
+      open?openRepos.add(repo):openRepos.delete(repo);
+      apply();
+    }));
+    const c=document.querySelector("#pb-repos [data-clear]");
+    if(c)c.addEventListener("click",()=>$("pb-clear").click());
+    apply();
+  }
+
+  async function api(method,path,body){
+    const r=await fetch(path,{method,headers:method==="POST"?{"X-PR-Board":"1","Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined,cache:"no-store"});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||r.statusText);
+    return j;
+  }
+  const load=()=>api("GET","/api/prs").then(render).catch(e=>{$("pb-err").hidden=false;$("pb-err").textContent="pr-board server unreachable: "+e.message});
+  const beat=()=>api("POST","/api/heartbeat",{client:"page"}).catch(()=>{});
+
+  $("pb-refresh").addEventListener("click",async()=>{
+    const b=$("pb-refresh");b.disabled=true;b.textContent="Refreshing…";
+    try{render(await api("POST","/api/refresh"))}catch(e){$("pb-err").hidden=false;$("pb-err").textContent=e.message}
+    b.disabled=false;b.textContent="Refresh";
+  });
+
+  const box=$("pb-cleanbox");
+  const stepLine=s=>{
+    const what=s.kind==="remote"?`Delete GitHub branch <code>${esc(s.branch)}</code>`:s.kind==="worktree"?`Remove worktree <code>${esc(s.path)}</code>`:`Delete local branch <code>${esc(s.branch)}</code> in ${esc(s.dir)}`;
+    if(s.result&&s.result!=="done"&&s.result!=="skipped")return `<li class="fail">${what}: ${esc(s.result)}</li>`;
+    if(s.skip)return `<li class="skip">Skip: ${what} (${esc(s.skip)})</li>`;
+    return `<li>${what}${s.result==="done"?" ✓":""}</li>`;
+  };
+  const planHTML=items=>`<div class="plan">${items.map(it=>`<div><b>${esc(it.repo.split("/")[1])}#${esc(it.n)}</b> ${esc(it.title)}<ul>${it.steps.length?it.steps.map(stepLine).join(""):`<li class="skip">Only removes it from the board</li>`}</ul></div>`).join("")}</div>`;
+  let token=null;
+  $("pb-cleanup").addEventListener("click",async()=>{
+    box.hidden=false;
+    box.innerHTML=`<b>Clean up ${view?view.merged:""} merged PRs</b><span class="skip">Checking GitHub branches and local worktrees…</span>`;
+    try{
+      const p=await api("GET","/api/cleanup");token=p.token;
+      box.innerHTML=`<b>Clean up ${p.items.length} merged PRs</b>
+        <ul><li>Removes them from the board</li><li>Deletes their branches on GitHub when they still exist</li><li>Removes their local worktrees and branches; skips any with uncommitted or unpushed work</li></ul>
+        ${planHTML(p.items)}
+        <div class="row"><button class="pb-btn solid" id="pb-clean-go" type="button">Clean up</button><button class="pb-btn" id="pb-clean-no" type="button">Cancel</button></div>`;
+      $("pb-clean-no").addEventListener("click",()=>{box.hidden=true;token=null});
+      $("pb-clean-go").addEventListener("click",async()=>{
+        $("pb-clean-go").disabled=true;$("pb-clean-go").textContent="Cleaning…";
+        try{
+          const r=await api("POST","/api/cleanup",{token});token=null;
+          box.innerHTML=`<b>Cleanup done</b>${planHTML(r.items)}<div class="row"><button class="pb-btn" id="pb-clean-no" type="button">Close</button></div>`;
+          $("pb-clean-no").addEventListener("click",()=>{box.hidden=true});
+          load();
+        }catch(e){box.innerHTML=`<b>Cleanup failed</b><span class="fail">${esc(e.message)}</span>`}
+      });
+    }catch(e){box.innerHTML=`<b>Could not plan the cleanup</b><span class="fail">${esc(e.message)}</span>`}
+  });
+
+  let fitTimer=0;
+  window.addEventListener("resize",()=>{clearTimeout(fitTimer);fitTimer=setTimeout(()=>fitSignals($("pb-repos")),100)});
+  if(document.fonts)document.fonts.ready.then(()=>fitSignals($("pb-repos")));
+  readHash();
+  load();beat();
+  setInterval(()=>{beat();load()},60000);
+})();
+</script>
+</body>
+</html>

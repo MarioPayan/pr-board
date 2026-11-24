@@ -1,0 +1,264 @@
+package prboard
+
+import (
+	"fmt"
+	"slices"
+	"strings"
+	"time"
+)
+
+// PR is what the collector stores for one pull request.
+type PR struct {
+	Repo           string        `json:"repo"` // owner/name
+	Number         int           `json:"number"`
+	Title          string        `json:"title"`
+	URL            string        `json:"url"`
+	Draft          bool          `json:"draft"`
+	State          string        `json:"state"` // OPEN, MERGED, CLOSED
+	MergedAt       time.Time     `json:"merged_at,omitzero"`
+	Base           string        `json:"base"`
+	Head           string        `json:"head"`
+	HeadOID        string        `json:"head_oid"`
+	HeadRepo       string        `json:"head_repo"`
+	DefaultBranch  string        `json:"default_branch"`
+	Mergeable      string        `json:"mergeable"`   // MERGEABLE, CONFLICTING, UNKNOWN
+	MergeState     string        `json:"merge_state"` // CLEAN, BEHIND, DIRTY, BLOCKED, ...
+	ReviewDecision string        `json:"review_decision"`
+	Reviews        []Review      `json:"reviews"`
+	Requests       []string      `json:"requests"`
+	ChecksTotal    int           `json:"checks_total"`
+	ChecksFailing  []string      `json:"checks_failing"`
+	ChecksPending  int           `json:"checks_pending"`
+	Threads        []Thread      `json:"threads"` // unresolved only
+	UpdatedAt      time.Time     `json:"updated_at"`
+	Body           string        `json:"body"`
+	Requires       []Requirement `json:"requires,omitempty"` // from [required:...] in the body; open PRs only
+}
+
+// Review is one entry of latestReviews.
+type Review struct {
+	Author string `json:"author"`
+	State  string `json:"state"` // APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED
+}
+
+// Thread is an unresolved review thread with its first comments.
+type Thread struct {
+	Comments []Comment `json:"comments"`
+}
+
+// Comment is one review-thread comment.
+type Comment struct {
+	Author string `json:"author"`
+	Body   string `json:"body"`
+}
+
+// Key is owner/name#n.
+func (p PR) Key() string { return fmt.Sprintf("%s#%d", p.Repo, p.Number) }
+
+// Derived state classes; they are also the page's CSS classes and the
+// State filter's values. An open PR is exactly one of the first three.
+const (
+	StReady   = "ready"   // green: ready to merge
+	StApprove = "approve" // yellow: everything is in place except an approval
+	StMissing = "missing" // red: anything else; the icons and Next say what
+	StMerged  = "merged"  // purple
+)
+
+// Signal is one icon on a card. N is 0 when the icon has no count.
+type Signal struct {
+	K     string `json:"k"`
+	N     int    `json:"n,omitempty"`
+	Title string `json:"title"`
+	Text  string `json:"text,omitempty"` // a chip's label (required PRs)
+	Ref   string `json:"ref,omitempty"`  // the required PR's key
+}
+
+// Derived is everything the page shows about a PR that follows from its data.
+type Derived struct {
+	State    string   `json:"state"`
+	Label    string   `json:"label"`
+	Signals  []Signal `json:"signals"`
+	Next     string   `json:"next"`
+	Category string   `json:"category"`
+}
+
+const staleDays = 7
+
+func (p PR) approved() bool {
+	if p.ReviewDecision == "APPROVED" {
+		return true
+	}
+	// repos without required reviews report no decision; an approving review still counts
+	return p.ReviewDecision == "" && slices.ContainsFunc(p.Reviews, func(r Review) bool { return r.State == "APPROVED" })
+}
+
+func (p PR) changesRequested() bool {
+	return p.ReviewDecision == "CHANGES_REQUESTED" ||
+		slices.ContainsFunc(p.Reviews, func(r Review) bool { return r.State == "CHANGES_REQUESTED" })
+}
+
+func (p PR) conflict() bool { return p.Mergeable == "CONFLICTING" || p.MergeState == "DIRTY" }
+
+func (p PR) noReviewer() bool { return p.ReviewDecision == "REVIEW_REQUIRED" && len(p.Requests) == 0 }
+
+func reviewers(rs []Review, state string) []string {
+	var out []string
+	for _, r := range rs {
+		if r.State == state {
+			out = append(out, r.Author)
+		}
+	}
+	return out
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
+}
+
+// Derive computes state, signals, next step and category tag.
+func Derive(p PR, now time.Time) Derived {
+	d := Derived{Category: Category(p.Title, p.Repo), Signals: []Signal{}}
+	if p.State == "MERGED" {
+		d.State, d.Label = StMerged, "Merged"
+		if !p.MergedAt.IsZero() {
+			d.Label = "Merged " + p.MergedAt.Local().Format("01-02")
+		}
+		return d
+	}
+	failing, pending := len(p.ChecksFailing), p.ChecksPending
+	approved, changes, conflict := p.approved(), p.changesRequested(), p.conflict()
+
+	// signals, in the prototype's order
+	add := func(k string, n int, title string) { d.Signals = append(d.Signals, Signal{K: k, N: n, Title: title}) }
+	if p.Draft {
+		add("draft", 0, "Draft")
+	}
+	// required PRs that still hold this one come first, done ones last
+	var reqNext string
+	addReq := func(r Requirement) {
+		k, state, ref := "req_unknown", "not found", shortRef(r.Repo, p.Repo, r.N)
+		switch r.State {
+		case "MERGED":
+			k, state = "req_done", "merged"
+		case "OPEN":
+			k, state = "req_open", "open"
+		case "CLOSED":
+			k, state = "req_closed", "closed without merging"
+		}
+		d.Signals = append(d.Signals, Signal{K: k, Title: "Merge after " + r.Key() + " (" + state + ")", Text: "after " + ref, Ref: r.Key()})
+		if reqNext == "" {
+			switch r.State {
+			case "MERGED":
+			case "OPEN":
+				reqNext = "merge " + ref + " first"
+			case "CLOSED":
+				reqNext = ref + " was closed without merging"
+			default:
+				reqNext = "check " + ref + ": not found"
+			}
+		}
+	}
+	for _, r := range p.Requires {
+		if r.State != "MERGED" {
+			addReq(r)
+		}
+	}
+	if failing > 0 {
+		add("ci_fail", failing, fmt.Sprintf("%d CI %s failing: %s", failing, plural(failing, "job", "jobs"), strings.Join(p.ChecksFailing, ", ")))
+	}
+	if pending > 0 {
+		add("ci_pend", pending, fmt.Sprintf("%d CI %s running", pending, plural(pending, "job", "jobs")))
+	}
+	if failing == 0 && pending == 0 && p.ChecksTotal > 0 {
+		add("ci_pass", 0, "CI green")
+	}
+	if approved {
+		t := "Approved"
+		if who := reviewers(p.Reviews, "APPROVED"); len(who) > 0 {
+			t = "Approved by " + strings.Join(who, ", ")
+		}
+		add("approved", 0, t)
+	}
+	if changes {
+		t := "Changes requested"
+		if who := reviewers(p.Reviews, "CHANGES_REQUESTED"); len(who) > 0 {
+			t = "Changes requested by " + strings.Join(who, ", ")
+		}
+		add("changes", 0, t)
+	}
+	if who := reviewers(p.Reviews, "DISMISSED"); len(who) > 0 {
+		add("dismissed", 0, "Review dismissed: "+strings.Join(who, ", "))
+	}
+	if p.noReviewer() && !p.Draft {
+		add("norev", 0, "No reviewer requested")
+	}
+	if len(p.Requests) > 0 {
+		add("rev", 0, "Review requested: "+strings.Join(p.Requests, ", "))
+	}
+	if conflict {
+		add("conflict", 0, "Merge conflicts with "+p.Base)
+	}
+	if p.MergeState == "BEHIND" {
+		add("behind", 0, "Behind "+p.Base)
+	}
+	if p.MergeState == "BLOCKED" && approved && failing == 0 && pending == 0 && !changes {
+		add("blocked", 0, "A branch rule still blocks the merge")
+	}
+	if n := len(p.Threads); n > 0 {
+		add("threads", n, fmt.Sprintf("%d unresolved review %s", n, plural(n, "thread", "threads")))
+	}
+	if days := int(now.Sub(p.UpdatedAt).Hours() / 24); !p.UpdatedAt.IsZero() && days > staleDays {
+		add("stale", days, fmt.Sprintf("%d days without an update", days))
+	}
+	for _, r := range p.Requires {
+		if r.State == "MERGED" {
+			addReq(r)
+		}
+	}
+
+	// in place: checks passed and none pending, no conflict, not behind, no
+	// requested changes and no required PR still to merge
+	inPlace := failing == 0 && pending == 0 && !conflict && p.MergeState != "BEHIND" && !changes && reqNext == ""
+	ready := !p.Draft && approved && inPlace && p.Mergeable == "MERGEABLE" && p.MergeState != "BLOCKED"
+	switch {
+	case ready:
+		d.State, d.Label = StReady, "Ready to merge"
+	case !p.Draft && !approved && inPlace:
+		d.State, d.Label = StApprove, "Ready to approve"
+	default:
+		d.State, d.Label = StMissing, "Something missing"
+	}
+
+	switch {
+	case conflict:
+		d.Next = "merge " + p.Base
+	case changes:
+		d.Next = "address the requested changes"
+	case failing > 0:
+		d.Next = "fix failing CI"
+	case p.Draft:
+		d.Next = "mark ready when you want review"
+	case p.noReviewer():
+		d.Next = "request a reviewer"
+	case reqNext != "":
+		d.Next = reqNext
+	case ready:
+		d.Next = "merge"
+	case p.MergeState == "BEHIND":
+		d.Next = "update from " + p.Base
+	case p.MergeState == "BLOCKED" && approved && failing == 0 && pending == 0:
+		d.Next = "check which branch rule blocks it on GitHub"
+	case pending > 0:
+		d.Next = "wait for CI"
+	case len(p.Requests) > 0:
+		d.Next = "wait for " + strings.Join(p.Requests, ", ")
+	case approved && p.Mergeable == "UNKNOWN":
+		d.Next = "refresh: GitHub is still computing mergeability"
+	case !approved:
+		d.Next = "get an approval"
+	}
+	return d
+}

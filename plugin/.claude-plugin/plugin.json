@@ -1,0 +1,6 @@
+{
+  "name": "pr-board",
+  "version": "0.3.0",
+  "description": "Keeps the local pr-board server alive while a Claude session runs.",
+  "author": { "name": "Mario Payan" }
+}

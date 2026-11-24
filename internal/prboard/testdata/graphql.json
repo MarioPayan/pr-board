@@ -1,0 +1,55 @@
+{
+  "data": {
+    "p0": {
+      "pullRequest": {
+        "number": 12, "title": "[app] [Widgets] Add the widget API", "url": "https://github.com/acme/app/pull/12",
+        "isDraft": false, "state": "OPEN", "mergedAt": null,
+        "baseRefName": "main", "headRefName": "feat/widget", "headRefOid": "abc123",
+        "mergeable": "MERGEABLE", "mergeStateStatus": "BLOCKED", "reviewDecision": "REVIEW_REQUIRED",
+        "updatedAt": "2026-11-20T10:00:00Z", "body": "Merge after #11.\n\nTickets: APP-42",
+        "headRepository": {"nameWithOwner": "acme/app"},
+        "repository": {"nameWithOwner": "acme/app", "defaultBranchRef": {"name": "main"}},
+        "latestReviews": {"nodes": [
+          {"author": {"login": "alice"}, "state": "CHANGES_REQUESTED"},
+          {"author": null, "state": "DISMISSED"}
+        ]},
+        "reviewRequests": {"nodes": [
+          {"requestedReviewer": {"__typename": "User", "login": "carol"}},
+          {"requestedReviewer": {"__typename": "Team", "name": "web-team"}},
+          {"requestedReviewer": null}
+        ]},
+        "commits": {"nodes": [{"commit": {"statusCheckRollup": {"contexts": {"nodes": [
+          {"__typename": "CheckRun", "name": "lint", "conclusion": "SUCCESS", "status": "COMPLETED"},
+          {"__typename": "CheckRun", "name": "unit", "conclusion": "FAILURE", "status": "COMPLETED"},
+          {"__typename": "CheckRun", "name": "e2e", "conclusion": null, "status": "IN_PROGRESS"},
+          {"__typename": "CheckRun", "name": "skipped", "conclusion": "SKIPPED", "status": "COMPLETED"},
+          {"__typename": "StatusContext", "context": "ci/legacy", "state": "ERROR"},
+          {"__typename": "StatusContext", "context": "deploy/preview", "state": "PENDING"}
+        ]}}}}]},
+        "reviewThreads": {"nodes": [
+          {"isResolved": true, "comments": {"nodes": [{"author": {"login": "alice"}, "body": "done"}]}},
+          {"isResolved": false, "comments": {"nodes": [
+            {"author": {"login": "alice"}, "body": "Please rename this."},
+            {"author": {"login": "dave"}, "body": "Will do."}
+          ]}}
+        ]}
+      }
+    },
+    "p1": {
+      "pullRequest": {
+        "number": 9, "title": "Old fix", "url": "https://github.com/acme/app/pull/9",
+        "isDraft": false, "state": "MERGED", "mergedAt": "2026-11-21T09:30:00Z",
+        "baseRefName": "main", "headRefName": "fix/old", "headRefOid": "def456",
+        "mergeable": "UNKNOWN", "mergeStateStatus": "UNKNOWN", "reviewDecision": "APPROVED",
+        "updatedAt": "2026-11-21T09:30:00Z", "body": "",
+        "headRepository": null,
+        "repository": {"nameWithOwner": "acme/app", "defaultBranchRef": {"name": "main"}},
+        "latestReviews": {"nodes": []}, "reviewRequests": {"nodes": []},
+        "commits": {"nodes": [{"commit": {"statusCheckRollup": null}}]},
+        "reviewThreads": {"nodes": []}
+      }
+    },
+    "p2": null
+  },
+  "errors": [{"message": "Could not resolve to a PullRequest with the number of 404."}]
+}

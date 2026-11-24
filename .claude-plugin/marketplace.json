@@ -1,0 +1,11 @@
+{
+  "name": "pr-board",
+  "owner": { "name": "Mario Payan" },
+  "plugins": [
+    {
+      "name": "pr-board",
+      "source": "./plugin",
+      "description": "Session check-ins for the local pr-board server."
+    }
+  ]
+}

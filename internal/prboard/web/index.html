@@ -76,7 +76,8 @@ html,body{margin:0;background:var(--bg)}
 .pb-drawer li small{grid-column:2;color:var(--muted);font-size:.8rem}
 .pb-drawer .sw{width:14px;height:14px;border-radius:3px;margin-top:3px}
 .pb-drawer .ln{width:26px;height:2px;background:var(--trunk);margin-top:10px}
-.pb-drawer .ic{justify-self:start}
+.pb-drawer .ic,.pb-drawer .tag{justify-self:start}
+.pb-drawer .dash{width:0;height:20px;border-left:5px dashed var(--muted);margin-left:4px}
 
 /* board */
 .repos{display:grid;gap:24px}
@@ -102,8 +103,13 @@ html,body{margin:0;background:var(--bg)}
 .cat{font-size:.72rem;line-height:18px;border:1px solid var(--line);border-radius:999px;padding:0 7px;color:var(--muted);margin-left:auto;flex:0 1 auto}
 .ttl{font-weight:600;line-height:22px;text-overflow:ellipsis}
 .sig{display:flex;flex-wrap:nowrap;align-items:center;gap:4px}
-.ic{display:inline-flex;flex:0 0 auto;align-items:center;gap:3px;height:22px;font:600 .78rem var(--mono);padding:0 6px;border-radius:6px;color:var(--k);background:color-mix(in srgb,var(--k) 13%,transparent);cursor:default;white-space:nowrap}
-.ic svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.ic{display:inline-flex;flex:0 0 auto;align-items:center;gap:3px;height:22px;font:600 .78rem var(--mono);padding:0 6px;border:1px solid transparent;border-radius:6px;color:var(--k);background:color-mix(in srgb,var(--k) 13%,transparent);cursor:default;white-space:nowrap}
+.ic svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.ic.lt{border-color:var(--k)}
+.ic.lt b{font:800 .72rem var(--mono);letter-spacing:.02em}
+.ic .who{max-width:12ch;overflow:hidden;text-overflow:ellipsis}
+.tag{font-size:.66rem;font-weight:700;letter-spacing:.06em;line-height:16px;border:1px solid currentColor;color:var(--muted);border-radius:4px;padding:0 5px;flex:0 0 auto}
+.pr.draft{border-left-style:dashed}
 .k-ok{--k:var(--green)}.k-bad{--k:var(--red)}.k-warn{--k:var(--amber)}.k-info{--k:var(--muted)}
 .next{font-size:.84rem;line-height:22px;color:var(--muted);text-overflow:ellipsis}
 .next b{color:var(--fg);font-weight:600}
@@ -118,18 +124,16 @@ html,body{margin:0;background:var(--bg)}
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
-  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></symbol>
-  <symbol id="i-up" viewBox="0 0 24 24"><path d="M7 11v9H4v-9zM7 11l4-8c1.5 0 2.5 1 2.2 2.6L12.5 10H19a2 2 0 0 1 2 2.3l-1.4 6.4A2 2 0 0 1 17.6 20H7"/></symbol>
-  <symbol id="i-down" viewBox="0 0 24 24"><g transform="rotate(180 12 12)"><path d="M7 11v9H4v-9zM7 11l4-8c1.5 0 2.5 1 2.2 2.6L12.5 10H19a2 2 0 0 1 2 2.3l-1.4 6.4A2 2 0 0 1 17.6 20H7"/></g></symbol>
-  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
-  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></symbol>
-  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
-  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
-  <symbol id="i-behind" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
-  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
-  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/></symbol>
+  <symbol id="i-timer" viewBox="0 0 24 24"><path d="M10 2h4M12 14l3-3"/><circle cx="12" cy="14" r="8"/></symbol>
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
-  <symbol id="i-sleep" viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M7 3c0 6 10 6 10 9s-10 3-10 9M17 3c0 6-10 6-10 9s10 3 10 9"/></symbol>
+  <symbol id="i-userplus" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6 1.5 0 2.8.3 3.9.8M18 14v6M15 17h6"/></symbol>
+  <symbol id="i-userclock" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6"/><circle cx="18" cy="18" r="4"/><path d="M18 16.5V18l1 1"/></symbol>
+  <symbol id="i-mergex" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10M6 9c0 5 6 4 8 7"/><path d="M15 3l6 6M21 3l-6 6"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-4.5L4 9M4 4v5h5M4 13a8 8 0 0 0 14 4.5l2-2.5M20 20v-5h-5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5"/></symbol>
+  <symbol id="i-after" viewBox="0 0 24 24"><path d="M14 6l-6 6 6 6"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+  <symbol id="i-sand" viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M7 3c0 6 10 6 10 9s-10 3-10 9M17 3c0 6-10 6-10 9s10 3 10 9"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
 </svg>
@@ -163,7 +167,7 @@ html,body{margin:0;background:var(--bg)}
   <div class="dh"><h2 id="pb-legend-h">Legend</h2><button class="pb-icon" id="pb-legend-close" type="button" aria-label="Close legend"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
   <h3>Colours</h3>
   <ul id="pb-colours"></ul>
-  <h3>Icons</h3>
+  <h3>Signals, in card order</h3>
   <ul id="pb-icons"></ul>
   <h3>Links</h3>
   <ul>
@@ -180,24 +184,28 @@ html,body{margin:0;background:var(--bg)}
     ["approve","amber","Ready to approve","Everything is in place except an approval."],
     ["missing","red","Something missing","Draft, CI failing or running, conflicts, behind, changes requested, a branch rule or a required PR still open. The icons say which."]
   ];
+  // every signal kind in the fixed card order: [icon, colour, meaning, letters, legend sample]
   const K={
-    ci_pass:["check","k-ok","CI green"], ci_fail:["x","k-bad","CI jobs failing"], ci_pend:["clock","k-warn","CI jobs running"],
-    approved:["up","k-ok","Approved"], changes:["down","k-bad","Changes requested"], dismissed:["undo","k-warn","Review dismissed"],
-    norev:["eye","k-warn","No reviewer requested"], rev:["user","k-info","Review requested"],
-    conflict:["bolt","k-bad","Merge conflicts"], behind:["behind","k-warn","Behind the base branch"], blocked:["lock","k-warn","A branch rule blocks the merge"],
-    threads:["chat","k-warn","Unresolved review threads"], draft:["pen","k-info","Draft"], stale:["sleep","k-warn","Days without an update"],
-    req_open:["lock","k-warn","Required PR still open"], req_done:["lock","k-ok","Required PR merged"],
-    req_closed:["lock","k-bad","Required PR closed without merging"], req_unknown:["lock","k-warn","Required PR not found"]
+    ci_fail:["x","k-bad","CI jobs failing","CI",{n:2}], ci_pend:["timer","k-warn","CI jobs running","CI",{n:3}], ci_pass:["check","k-ok","CI green","CI"],
+    approved:["check","k-ok","Approved","RV"], changes:["x","k-bad","Changes requested","RV"], dismissed:["undo","k-warn","Approval dismissed","RV"],
+    norev:["userplus","k-warn","No reviewer requested"], rev:["userclock","k-info","Waiting on a requested reviewer or team","",{x:"carol"}],
+    conflict:["mergex","k-bad","Merge conflicts"], behind:["sync","k-warn","Behind the base branch"], blocked:["shield","k-warn","A branch rule blocks the merge"],
+    req_open:["after","k-warn","Required PR still open","",{x:"after #412"}], req_closed:["after","k-bad","Required PR closed without merging","",{x:"after repo#90"}],
+    req_unknown:["after","k-warn","Required PR not found","",{x:"after repo#90"}], req_done:["after","k-ok","Required PR merged","",{x:"after repo#90"}],
+    threads:["chat","k-warn","Unresolved review threads","",{n:3}], stale:["sand","k-warn","Days without an update","",{n:12}]
   };
   const NONE="~none";
   const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const safeURL=u=>/^https:\/\/github\.com\//.test(u||"")?u:"#";
   const $=id=>document.getElementById(id);
-  const ic=(k,n,t,x)=>{const d=K[k];if(!d)return"";return `<span class="ic ${d[1]}" title="${esc(t||d[2])}"><svg aria-hidden="true"><use href="#i-${d[0]}"/></svg>${n?esc(n):""}${x?esc(x):""}</span>`};
+  const ic=(k,n,t,x)=>{const d=K[k];if(!d)return"";return `<span class="ic ${d[1]}${d[3]?" lt":""}" data-k="${k}" data-name="${esc(d[2])}" title="${esc(t||d[2])}">${d[3]?`<b>${d[3]}</b>`:""}<svg aria-hidden="true"><use href="#i-${d[0]}"/></svg>${n?esc(n):""}${x?`<span class="${k==="rev"?"who":"tx"}">${esc(x)}</span>`:""}</span>`};
 
   $("pb-colours").innerHTML=STATES.map(s=>`<li><span class="sw" style="background:var(--${s[1]})"></span><span>${esc(s[2])}</span><small>${esc(s[3])}</small></li>`).join("")+
     `<li><span class="sw" style="background:var(--purple)"></span><span>Merged</span><small>Folded under the trunk until Clean up removes it.</small></li>`;
-  $("pb-icons").innerHTML=Object.entries(K).map(([k,v])=>`<li>${ic(k)}<span>${esc(v[2])}</span></li>`).join("");
+  $("pb-icons").innerHTML=Object.entries(K).map(([k,v])=>`<li>${ic(k,v[4]&&v[4].n,"",v[4]&&v[4].x)}<span>${esc(v[2])}</span></li>`).join("")+
+    `<li><span class="ic k-info more" data-name="More">+2</span><span>Signals that do not fit</span><small>The tooltip lists them.</small></li>`+
+    `<li><span class="tag">DRAFT</span><span>Draft</span><small>Next to the number; the card's left border is dashed.</small></li>`+
+    `<li><span class="dash"></span><span>Dashed left border</span><small>The PR is a draft.</small></li>`;
 
   // ---- legend drawer
   const drawer=$("pb-legend"),shade=$("pb-shade"),legendBtn=$("pb-legend-btn");
@@ -225,7 +233,7 @@ html,body{margin:0;background:var(--bg)}
   const card=(c,repo)=>{
     const open=c.state!=="merged";
     const text=`#${c.n} ${c.title} ${c.head||""}`.toLowerCase();
-    return `<article class="pr ${esc(c.state)}" data-n="${esc(c.n)}" data-repo="${esc(repo)}" data-state="${esc(c.state)}" data-cat="${esc(c.category||NONE)}" data-text="${esc(text)}"><div class="hd"><a class="num" href="${esc(safeURL(c.url))}" target="_blank" rel="noopener">#${esc(c.n)}</a><span class="st" title="${esc(c.label)}">${esc(c.label)}</span>${c.base?`<span class="base" title="Base branch ${esc(c.base)}">on ${esc(c.base)}</span>`:""}${c.category?`<span class="cat" title="Category: ${esc(c.category)}">${esc(c.category)}</span>`:""}</div>
+    return `<article class="pr ${esc(c.state)}${c.draft?" draft":""}" data-n="${esc(c.n)}" data-repo="${esc(repo)}" data-state="${esc(c.state)}" data-cat="${esc(c.category||NONE)}" data-text="${esc(text)}"><div class="hd"><a class="num" href="${esc(safeURL(c.url))}" target="_blank" rel="noopener">#${esc(c.n)}</a>${c.draft?`<span class="tag" title="Draft">DRAFT</span>`:""}<span class="st" title="${esc(c.label)}">${esc(c.label)}</span>${c.base?`<span class="base" title="Base branch ${esc(c.base)}">on ${esc(c.base)}</span>`:""}${c.category?`<span class="cat" title="Category: ${esc(c.category)}">${esc(c.category)}</span>`:""}</div>
     <div class="ttl" title="${esc(c.title)}">${esc(c.title)}</div>${open?`<div class="sig">${(c.signals||[]).map(s=>ic(s.k,s.n,s.title,s.text)).join("")}</div>
     <div class="next" title="${esc(c.next||"")}">${c.next?`<b>Next:</b> ${esc(c.next)}`:""}</div>`:""}</article>`;
   };
@@ -243,7 +251,7 @@ html,body{margin:0;background:var(--bg)}
       for(let i=icons.length-1;i>=0;i--){
         icons[i].hidden=true;hidden.unshift(icons[i]);
         more.textContent="+"+hidden.length;
-        more.title=hidden.map(h=>h.title).join("\n");
+        more.title=hidden.map(h=>h.title===h.dataset.name?h.title:`${h.dataset.name}: ${h.title}`).join("\n");
         if(row.scrollWidth<=row.clientWidth)break;
       }
     });

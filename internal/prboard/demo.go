@@ -36,7 +36,7 @@ func DemoStore(now time.Time) *Store {
 
 	prs := []PR{
 		// web: #415 must wait for #412
-		pr("web", 412, "[Checkout] Add saved cards to the payment step", nil),
+		pr("web", 412, "[Checkout] Add saved cards to the payment step", func(p *PR) { p.Threads = []Thread{{}} }),
 		pr("web", 415, "[Checkout] Show the delivery estimate in the cart", func(p *PR) {
 			p.Body = "Uses the saved-card lookup.\n\n[required:#412]"
 		}),

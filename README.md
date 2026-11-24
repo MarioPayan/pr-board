@@ -10,7 +10,7 @@ All screenshots come from `pr-board demo`, a fictional organization.
 
 ![The same board in dark mode](docs/screenshots/pr-board-dark.png)
 
-![The legend drawer open on the right, with the colours, icons and links](docs/screenshots/pr-board-legend.png)
+![The legend drawer open on the right, with the colours, the signals in card order and the links](docs/screenshots/pr-board-legend.png)
 
 ![Filtered to one repository and two states: the chain stays whole, the PR that does not match is dimmed](docs/screenshots/pr-board-filtered.png)
 
@@ -23,7 +23,21 @@ All screenshots come from `pr-board demo`, a fictional organization.
 | red | Something missing: any other open PR (draft, CI failing or running, conflicts, behind, changes requested, a branch rule, a required PR still open); the icons say what |
 | purple | Merged, until Clean up removes it |
 
-Every open card has the same height: one header row (number, state, base branch, category), the title on one line (the full title in its tooltip), one signals row that never wraps (icons that do not fit fold into a `+N` chip whose tooltip lists them) and one Next line naming the missing thing. Merged cards are shorter, and all the same height. Icons carry a count where one applies and a tooltip with the detail (which jobs fail, who approved). The info button in the header opens the legend drawer, which lists the colours, every icon and the links.
+Every open card has the same height: one header row (number, a DRAFT tag on drafts, state, base branch, category), the title on one line (the full title in its tooltip), one signals row that never wraps (signals that do not fit fold into a `+N` chip whose tooltip names each hidden one and its detail) and one Next line naming the missing thing. A draft's left border is dashed. Merged cards are shorter, and all the same height. The info button in the header opens the legend drawer, which lists the colours, every signal in card order and the links.
+
+The signals always come in the same order, so each one sits in the same place on every card. Each has a tooltip with the detail (which jobs fail, who approved, who dismissed):
+
+| Signal | Shows |
+|---|---|
+| CI | the letters `CI` with a check (green), a cross and the failing count (red) or a stopwatch and the running count (amber) |
+| Review | the letters `RV` with a check (approved), a cross (changes requested) or an undo arrow (approval dismissed); always right after CI, and both letter chips have a border in their colour so the two read apart |
+| Reviewer | a person with a plus (no reviewer requested), or a person with a clock and the requested login or team, cut at about 12 characters |
+| Conflicts | two branches joining, with a cross |
+| Behind | sync arrows |
+| Branch rule | a shield with a cross: approved and green, but a rule still blocks the merge |
+| Required PRs | a left chevron and `after #412` or `after repo#90` (see below) |
+| Threads | a speech bubble and the count of unresolved threads |
+| Stale | an hourglass and the days since the last update, after 7 |
 
 A solid link joins a PR to the PR whose branch is its base, or to the PR its description requires. The tag in a card's header is its category: the first token in square brackets in the title (`[Checkout]`, `[Design system]`), each bracket split on `|`, skipping the repository's own name (`[web]`), issue keys (`[WEB-123]`) and `required:` lists. No such token, no tag. The title is shown unchanged.
 
@@ -47,7 +61,7 @@ Name the PRs that must merge first anywhere in the description, outside fenced c
 [required:acme/infra#478, acme:design-system#12, api#4021, #4543]
 ```
 
-`owner/repo#N` and `owner:repo#N` are full references, `repo#N` uses the PR's owner, `#N` its repository. The keyword is case-insensitive, several blocks merge, and malformed items are skipped. An open PR in the same repository on the board becomes the lane's previous card (solid link, like a stacked branch; when several qualify, the first one, and the rest stay chips). Every other requirement is a lock chip, "after repo#N", coloured by the target's state, which the collector looks up with one extra GraphQL query when the target is not on the board: green when merged, amber when open, red when closed without merging, amber "not found" when GitHub does not know it. Any requirement that is not merged makes the card red with "merge #N first".
+`owner/repo#N` and `owner:repo#N` are full references, `repo#N` uses the PR's owner, `#N` its repository. The keyword is case-insensitive, several blocks merge, and malformed items are skipped. An open PR in the same repository on the board becomes the lane's previous card (solid link, like a stacked branch; when several qualify, the first one, and the rest stay chips). Every other requirement is a chevron chip, "after repo#N", coloured by the target's state, which the collector looks up with one extra GraphQL query when the target is not on the board: green when merged, amber when open, red when closed without merging, amber "not found" when GitHub does not know it. Any requirement that is not merged makes the card red with "merge #N first".
 
 ## Install
 
@@ -118,4 +132,4 @@ Upgrading from pr-map: on the first run, when `~/.config/pr-board/config.json` o
 go vet ./... && go test ./...
 ```
 
-Tests cover the colour rules, chains, the GraphQL parser on a recorded-shape fixture, collection merges, the Host/Origin/header guard, idle exit, singleton reuse and stale locks, the session loop's exit, loading an old store, moving the old pr-map files, the setup message, the demo board, and the cleanup skip rules on temporary git repositories with a fake `gh`.
+Tests cover the colour rules, the fixed signal order, chains, the GraphQL parser on a recorded-shape fixture, collection merges, the Host/Origin/header guard, idle exit, singleton reuse and stale locks, the session loop's exit, loading an old store, moving the old pr-map files, the setup message, the demo board, and the cleanup skip rules on temporary git repositories with a fake `gh`.

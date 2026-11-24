@@ -64,11 +64,21 @@ func TestSegment(t *testing.T) {
 		{"colour and link", func(Term) Term { return colour }, lineStore(1, 0, 1, 2),
 			"\x1b]8;;http://127.0.0.1:7878/\x1b\\\x1b[36m[PRs]\x1b[0m\x1b]8;;\x1b\\ \x1b[31m✗1\x1b[0m \x1b[32m✓1\x1b[0m \x1b[36m⊙2\x1b[0m"},
 		{"colour without link", func(Term) Term { c := colour; c.Link = ""; return c }, lineStore(0, 0, 0, 0), "\x1b[36m[PRs]\x1b[0m"},
-		{"drafts are something missing, as on the page", nil, func() *Store {
-			s := lineStore(0, 0, 1, 0)
+		{"drafts count on their own, not as something missing", nil, func() *Store {
+			s := lineStore(2, 0, 1, 1)
+			s.PRs[0].Draft, s.PRs[2].Draft = true, true
+			return s
+		}(), "[PRs] ✗1 ✎2 ⊙1"},
+		{"drafts in ascii", func(t Term) Term { t.ASCII = true; return t }, func() *Store {
+			s := lineStore(0, 1, 0, 0)
 			s.PRs[0].Draft = true
 			return s
-		}(), "[PRs] ✗1"},
+		}(), "[PRs] d1"},
+		{"drafts are dim", func(Term) Term { c := colour; c.Link = ""; return c }, func() *Store {
+			s := lineStore(1, 0, 0, 0)
+			s.PRs[0].Draft = true
+			return s
+		}(), "\x1b[36m[PRs]\x1b[0m \x1b[90m✎1\x1b[0m"},
 		{"merged PRs do not count", nil, func() *Store {
 			s := lineStore(0, 0, 1, 0)
 			s.PRs[0].State = "MERGED"
@@ -96,7 +106,7 @@ func TestSegmentMatchesTheHeaderCounters(t *testing.T) {
 	for _, x := range []struct {
 		n int
 		g string
-	}{{c[StMissing], "✗"}, {c[StApprove], "◷"}, {c[StReady], "✓"}, {BuildView(s, now).ToReview, "⊙"}} {
+	}{{c[StMissing], "✗"}, {c[StApprove], "◷"}, {c[StReady], "✓"}, {c[StDraft], "✎"}, {BuildView(s, now).ToReview, "⊙"}} {
 		if x.n > 0 {
 			want += " " + x.g + strconv.Itoa(x.n)
 		}
@@ -104,7 +114,19 @@ func TestSegmentMatchesTheHeaderCounters(t *testing.T) {
 	if got := plainTerm().Segment(s); got != want {
 		t.Errorf("segment %q, counters %q", got, want)
 	}
-	if c[StMissing]+c[StApprove]+c[StReady] != BuildView(s, now).Open {
+	if c[StDraft] == 0 {
+		t.Error("the demo board has no drafts")
+	}
+	drafts := 0
+	for _, p := range s.PRs {
+		if p.State == "OPEN" && p.Draft && !p.ToReview {
+			drafts++
+		}
+	}
+	if c[StDraft] != drafts {
+		t.Errorf("draft counter %d, open drafts %d", c[StDraft], drafts)
+	}
+	if c[StMissing]+c[StApprove]+c[StReady]+c[StDraft] != BuildView(s, now).Open {
 		t.Errorf("counts %v do not add up to %d open", c, BuildView(s, now).Open)
 	}
 }
@@ -146,9 +168,9 @@ func TestList(t *testing.T) {
 		{"mine then review, worst first", func(t Term) Term { t.Owners = []string{"acme"}; t.TitleChars = 30; return t }, mk(), `⑂ acme  5 mine · 1 to review
  mine   ✗✗ web          4     conflict and changes
         ✗✓ api          2     failing
-        ◷· design-syst… 5     DRAFT a draft with a very lon…
         ·◷ web          3     waits on a reviewer
         ✓✓ web          1     ready one
+        ◷· design-syst… 5     DRAFT a draft with a very lon…
  review ✓· api          9     please review
 `},
 		{"truncated with + N more", func(t Term) Term { t.Max = 2; t.ASCII = true; return t }, mk(), `PR  5 mine . 1 to review
@@ -181,8 +203,10 @@ func TestList(t *testing.T) {
 func TestListColoursTheNumberByState(t *testing.T) {
 	tm := plainTerm()
 	tm.NoColor = false
-	got := tm.List(lineStore(1, 1, 1, 0))
-	for _, want := range []string{"\x1b[31m1    \x1b[0m", "\x1b[33m2    \x1b[0m", "\x1b[32m3    \x1b[0m"} {
+	st := lineStore(1, 1, 2, 0)
+	st.PRs[3].Draft = true
+	got := tm.List(st)
+	for _, want := range []string{"\x1b[31m1    \x1b[0m", "\x1b[33m2    \x1b[0m", "\x1b[32m3    \x1b[0m", "\x1b[90m4    \x1b[0m"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in\n%q", want, got)
 		}
@@ -191,11 +215,11 @@ func TestListColoursTheNumberByState(t *testing.T) {
 
 func TestLegendFollowsTheGlyphs(t *testing.T) {
 	tm := plainTerm()
-	if l := tm.Legend(); !strings.Contains(l, "✗8 ◷3 ✓2 ⊙6") || !strings.Contains(l, "└ eight") {
+	if l := tm.Legend(); !strings.Contains(l, "✗8 ◷3 ✓2 ✎4 ⊙6") || !strings.Contains(l, "└ eight") || !strings.Contains(l, "✎  drafts") {
 		t.Errorf("unicode legend:\n%s", l)
 	}
 	tm.ASCII = true
-	if l := tm.Legend(); !strings.Contains(l, "x8 ~3 +2 @6") || strings.ContainsAny(l, "✗◷✓⊙│└") {
+	if l := tm.Legend(); !strings.Contains(l, "x8 ~3 +2 d4 @6") || strings.ContainsAny(l, "✗◷✓✎⊙│└") {
 		t.Errorf("ascii legend:\n%s", l)
 	}
 }

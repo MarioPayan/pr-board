@@ -30,13 +30,13 @@ type Term struct {
 	Max        int // rows before "+N more"
 }
 
-type glyphs struct{ ok, pend, fail, none, ell, head, sep, eyes string }
+type glyphs struct{ ok, pend, fail, none, ell, head, sep, eyes, draft string }
 
 func (t Term) g() glyphs {
 	if t.ASCII {
-		return glyphs{ok: "+", pend: "~", fail: "x", none: ".", ell: ">", head: "PR", sep: ".", eyes: "@"}
+		return glyphs{ok: "+", pend: "~", fail: "x", none: ".", ell: ">", head: "PR", sep: ".", eyes: "@", draft: "d"}
 	}
-	return glyphs{ok: "✓", pend: "◷", fail: "✗", none: "·", ell: "…", head: "⑂", sep: "·", eyes: "⊙"}
+	return glyphs{ok: "✓", pend: "◷", fail: "✗", none: "·", ell: "…", head: "⑂", sep: "·", eyes: "⊙", draft: "✎"}
 }
 
 const (
@@ -84,21 +84,34 @@ func (t Term) staleMark(refreshed time.Time) string {
 	return t.paint("(stale "+HumanAge(age)+")", cGrey)
 }
 
-// StateCounts counts the user's open PRs per colour, as the page's header
-// counters do: PRs to review are not in them.
+// StDraft is the counter drafts get on the page header and the segment,
+// apart from the colours: a draft is parked, not missing something. Its row
+// keeps its state (red) on the page.
+const StDraft = "draft"
+
+// counterOf is the header counter a card counts in.
+func counterOf(c Card) string {
+	if c.Draft {
+		return StDraft
+	}
+	return c.State
+}
+
+// StateCounts counts the user's open PRs per header counter, as the page
+// does: drafts on their own, PRs to review not at all.
 func StateCounts(v View) map[string]int {
-	c := map[string]int{StReady: 0, StApprove: 0, StMissing: 0}
+	c := map[string]int{StReady: 0, StApprove: 0, StMissing: 0, StDraft: 0}
 	for _, g := range v.Repos {
 		for _, r := range g.Rows {
-			c[r.State]++
+			c[counterOf(r.Card)]++
 		}
 	}
 	return c
 }
 
 // Segment is the statusline segment: the label, then your open PRs by
-// colour (something missing, ready to approve, ready to merge) and how many
-// wait on your review. A zero is left out; the label alone means nothing is
+// colour (something missing, ready to approve, ready to merge), your drafts
+// and how many wait on your review. A zero is left out; the label alone means nothing is
 // open. A store that was never filled prints nothing.
 func (t Term) Segment(s *Store) string {
 	if s == nil || s.Refreshed.IsZero() {
@@ -118,6 +131,7 @@ func (t Term) Segment(s *Store) string {
 		{c[StMissing], g.fail, cRed},
 		{c[StApprove], g.pend, cAmber},
 		{c[StReady], g.ok, cGreen},
+		{c[StDraft], g.draft, cGrey},
 		{v.ToReview, g.eyes, cCyan},
 	} {
 		if x.n > 0 {
@@ -187,9 +201,10 @@ func reviewLight(c Card) light {
 	return lNone
 }
 
-var stateRank = map[string]int{StMissing: 0, StApprove: 1, StReady: 2}
+// drafts last: they are parked
+var stateRank = map[string]int{StMissing: 0, StApprove: 1, StReady: 2, StDraft: 3}
 
-var stateColour = map[string]string{StMissing: cRed, StApprove: cAmber, StReady: cGreen}
+var stateColour = map[string]string{StMissing: cRed, StApprove: cAmber, StReady: cGreen, StDraft: cGrey}
 
 func (t Term) cut(s string, n int) string {
 	if n <= 0 {
@@ -225,7 +240,7 @@ type listRow struct {
 
 func sortRows(rs []listRow) {
 	slices.SortStableFunc(rs, func(a, b listRow) int {
-		if c := cmp.Compare(stateRank[a.card.State], stateRank[b.card.State]); c != 0 {
+		if c := cmp.Compare(stateRank[counterOf(a.card)], stateRank[counterOf(b.card)]); c != 0 {
 			return c
 		}
 		if c := cmp.Compare(min(a.ci, a.rv), min(b.ci, b.rv)); c != 0 {
@@ -242,9 +257,9 @@ func sortRows(rs []listRow) {
 }
 
 // List is the whole block: a header, then a row per open PR, yours first and
-// then the ones waiting on your review, worst first. Each row has two lights
-// (CI, review), the repository, the number in its colour on the page and the
-// title. Nothing open prints nothing.
+// then the ones waiting on your review, worst first and drafts last. Each
+// row has two lights (CI, review), the repository, the number in its
+// header counter's colour and the title. Nothing open prints nothing.
 func (t Term) List(s *Store) string {
 	if s == nil || s.Refreshed.IsZero() {
 		return ""
@@ -291,7 +306,7 @@ func (t Term) List(s *Store) string {
 		lines = append(lines, " "+t.paint(padr(label, 7), cCyan)+
 			t.lightText(r.ci)+t.lightText(r.rv)+" "+
 			t.paint(padr(t.cut(shortRepo(r.card.Repo), t.RepoChars), t.RepoChars), cGrey)+" "+
-			t.paint(padr(fmt.Sprint(r.card.N), 5), stateColour[r.card.State])+" "+
+			t.paint(padr(fmt.Sprint(r.card.N), 5), stateColour[counterOf(r.card)])+" "+
 			t.cut(title, t.TitleChars))
 	}
 	if hidden := len(all) - len(shown); hidden > 0 {
@@ -312,16 +327,18 @@ func (t Term) Legend() string {
 		label = "the segment"
 	}
 	// the example is fixed so the tree lines up
-	return fmt.Sprintf(`    [PRs] %[1]s8 %[2]s3 %[3]s2 %[4]s6
-          %[5]s  %[5]s  %[5]s  %[6]s six are waiting on your review
+	return fmt.Sprintf(`    [PRs] %[1]s8 %[2]s3 %[3]s2 %[9]s4 %[4]s6
+          %[5]s  %[5]s  %[5]s  %[5]s  %[6]s six are waiting on your review
+          %[5]s  %[5]s  %[5]s  %[6]s four of yours are drafts
           %[5]s  %[5]s  %[6]s two of yours are ready to merge
           %[5]s  %[6]s three of yours are ready to approve
           %[6]s eight of yours have something missing
 
-    %[1]s  something missing   a draft, CI failing or running, a conflict, behind,
-                          changes requested, a branch rule or a required PR still open
+    %[1]s  something missing   CI failing or running, a conflict, behind, changes
+                          requested, a branch rule or a required PR still open
     %[2]s  ready to approve    everything is in place except an approval
     %[3]s  ready to merge      approved, every check passed, mergeable
+    %[9]s  drafts              yours, still drafts, whatever else they need
     %[4]s  to review           someone else's open PR that requests your review
 
 These are the page's header counters, so the segment and the board always agree.
@@ -329,7 +346,7 @@ A count of zero is left out, so %[7]s on its own means nothing is open. The labe
 links to the board.
 
 `+"`pr-board list`"+` spells it out, a row per pull request with two lights, CI on the
-left and review on the right, and the number in its colour on the board:
+left and review on the right, and the number in its counter's colour, drafts last:
 
           CI                          review
     %[3]s     every check passed          approved
@@ -338,5 +355,5 @@ left and review on the right, and the number in its colour on the board:
     %[8]s     the repo runs no checks     nobody has been asked
 
 Colour repeats the shape, so a terminal without one still reads.
-`, g.fail, g.pend, g.ok, g.eyes, bar, cnr, label, g.none)
+`, g.fail, g.pend, g.ok, g.eyes, bar, cnr, label, g.none, g.draft)
 }

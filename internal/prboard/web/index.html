@@ -241,8 +241,12 @@ html,body{margin:0;background:var(--bg)}
   const STATES=[
     ["ready","green","Ready to merge","Approved, every check passed, mergeable, not behind, nothing required first."],
     ["approve","amber","Ready to approve","Everything is in place except an approval."],
-    ["missing","red","Something missing","Draft, CI failing or running, conflicts, behind, changes requested, a branch rule or a required PR still open. The icons say which."]
+    ["missing","red","Something missing","CI failing or running, conflicts, behind, changes requested, a branch rule or a required PR still open. The icons say which."],
+    ["draft","muted","Drafts","Yours, still drafts, whatever else they need: counted apart from the colours. The row keeps its red bar, dashed, with a DRAFT tag."]
   ];
+  // the header counter an open card counts in: a draft is its own, whatever its colour
+  const counter=c=>c.state!=="merged"&&c.draft?"draft":c.state;
+  const COLOURS=STATES.filter(s=>s[0]!=="draft");
   // every signal kind in the fixed card order: [icon, colour, meaning, letters, legend sample, legend note]
   const K={
     ci_fail:["x","k-bad","CI jobs failing","CI",{n:2}], ci_pend:["timer","k-warn","CI jobs running","CI",{n:3}], ci_pass:["check","k-ok","CI green","CI"],
@@ -259,11 +263,11 @@ html,body{margin:0;background:var(--bg)}
   const $=id=>document.getElementById(id);
   const ic=(k,n,t,x)=>{const d=K[k];if(!d)return"";return `<span class="ic ${d[1]}${d[3]?" lt":""}" data-k="${k}" data-name="${esc(d[2])}" title="${esc(t||d[2])}">${d[3]?`<b>${d[3]}</b>`:""}<svg aria-hidden="true"><use href="#i-${d[0]}"/></svg>${n?esc(n):""}${x?`<span class="${k==="rev"?"who":"tx"}">${esc(x)}</span>`:""}</span>`};
 
-  $("pb-colours").innerHTML=STATES.map(s=>`<li><span class="bar" style="background:var(--${s[1]})"></span><span>${esc(s[2])}</span><small>${esc(s[3])}</small></li>`).join("")+
+  $("pb-colours").innerHTML=COLOURS.map(s=>`<li><span class="bar" style="background:var(--${s[1]})"></span><span>${esc(s[2])}</span><small>${esc(s[3])}</small></li>`).join("")+
     `<li><span class="bar" style="background:var(--purple)"></span><span>Merged</span><small>Folded at the end of its group until Clean up removes it; Show merged lists them.</small></li>`;
   $("pb-icons").innerHTML=Object.entries(K).map(([k,v])=>`<li>${ic(k,v[4]&&v[4].n,"",v[4]&&v[4].x)}<span>${esc(v[2])}</span>${v[5]?`<small>${esc(v[5])}</small>`:""}</li>`).join("")+
     `<li><span class="ic k-info more" data-name="More">+2</span><span>Signals that do not fit</span><small>The tooltip lists them.</small></li>`+
-    `<li><span class="tag">DRAFT</span><span>Draft</span><small>Next to the number; the row's left bar is dashed.</small></li>`+
+    `<li><span class="tag">DRAFT</span><span>Draft</span><small>Next to the number; the row's left bar is dashed. Drafts have their own counter and State filter, not the red one.</small></li>`+
     `<li><span class="dash"></span><span>Dashed left bar</span><small>The PR is a draft.</small></li>`;
 
   // ---- legend drawer
@@ -320,7 +324,7 @@ html,body{margin:0;background:var(--bg)}
     const text=`#${c.n} ${c.title} ${c.head||""}`.toLowerCase();
     const rp=by==="repo"?`<span class="rp" title="${esc(c.repo)} → ${esc(c.base)}"><em>→ ${esc(c.base)}</em></span>`
       :`<span class="rp" title="${esc(c.repo)} → ${esc(c.base)}">${esc(s)}<em> → ${esc(c.base)}</em></span>`;
-    const attrs=`data-key="${esc(c.key)}" data-parent="${esc(c.parent||"")}" data-depth="${depth||0}" data-chain="${esc(chain)}" data-group="${esc(gid)}" data-n="${esc(c.n)}" data-repo="${esc(s)}" data-state="${esc(c.state)}" data-cat="${esc(c.category||NONE)}" data-text="${esc(text)}"`;
+    const attrs=`data-key="${esc(c.key)}" data-parent="${esc(c.parent||"")}" data-depth="${depth||0}" data-chain="${esc(chain)}" data-group="${esc(gid)}" data-n="${esc(c.n)}" data-repo="${esc(s)}" data-state="${esc(counter(c))}" data-cat="${esc(c.category||NONE)}" data-text="${esc(text)}"`;
     const head=`<div class="hd"><a class="num" href="${esc(safeURL(c.url))}" target="_blank" rel="noopener">#${esc(c.n)}</a>${c.draft?`<span class="tag" title="Draft">DRAFT</span>`:""}</div>${rp}<div class="ttl" title="${esc(c.title)}">${esc(shownTitle(c,by))}</div>`;
     if(!open)return `<article class="pr merged" ${attrs} title="${esc(c.label)}">${head}<div class="sig"><span class="ml">${esc(c.label)}</span></div><div class="next"></div></article>`;
     if(by==="review")return `<article class="pr rv ${esc(c.state)}${c.draft?" draft":""}" ${attrs} title="${esc(c.label)}">${head}<div class="sig">${(c.signals||[]).map(s=>ic(s.k,s.n,s.title,s.text)).join("")}</div><div class="next" title="Author">${c.author?`by <b>${esc(c.author)}</b>`:""}</div></article>`;
@@ -470,7 +474,7 @@ html,body{margin:0;background:var(--bg)}
       <pre>"owners": ["your-org", "your-username"]</pre>
       <p>The next refresh picks it up; press Refresh when you have saved the file.</p></div>`;
   }
-  const counts=rows=>{const c={ready:0,approve:0,missing:0};rows.forEach(r=>{if(r.state in c)c[r.state]++});return c};
+  const counts=rows=>{const c={ready:0,approve:0,missing:0,draft:0};rows.forEach(r=>{const k=counter(r);if(k in c)c[k]++});return c};
   const dots=c=>STATES.map(s=>`<span title="${esc(s[2])}"><i style="background:var(--${s[1]})"></i>${c[s[0]]}</span>`).join("");
   function groupHTML(g,by){
     const gid=by==="repo"?short(g.key):(g.key||NONE);

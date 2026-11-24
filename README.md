@@ -6,7 +6,7 @@ A local page that lists your open GitHub pull requests: one full-width row per P
 
 All screenshots come from `pr-board demo`, a fictional organization.
 
-![The board in light mode, grouped by category: green, yellow and red rows, a required-PR chain, a stacked branch and a chain across two repositories](docs/screenshots/pr-board-light.png)
+![The board in light mode, grouped by category, with the PRs to review on top: green, yellow and red rows, a required-PR chain, a stacked branch and a chain across two repositories](docs/screenshots/pr-board-light.png)
 
 ![The same board in dark mode](docs/screenshots/pr-board-dark.png)
 
@@ -14,7 +14,7 @@ All screenshots come from `pr-board demo`, a fictional organization.
 
 ![Filtered to two repositories and two states: each chain stays whole, the PRs that do not match are dimmed](docs/screenshots/pr-board-filtered.png)
 
-![Grouped by repository: one band per repository with its branch and merged count, the category as a pill on each row](docs/screenshots/pr-board-repo.png)
+![Grouped by repository: one band per repository with its branch and merged count, the category as a pill on each row, the PRs to review on top](docs/screenshots/pr-board-repo.png)
 
 ## What the page shows
 
@@ -27,15 +27,19 @@ The colour is the row's left bar:
 | red | Something missing: any other open PR (draft, CI failing or running, conflicts, behind, changes requested, a branch rule, a required PR still open); the icons say what |
 | purple | Merged, until Clean up removes it |
 
-Every open row has the same height and five columns: the number (a DRAFT tag on drafts), the repository and the branch it merges into (`web → main`), the title on one line (the full title in its tooltip), one signals row that never wraps (signals that do not fit fold into a `+N` chip whose tooltip names each hidden one and its detail) and the Next step. Hovering a row names its state. A draft's left bar is dashed. Merged rows are shorter and purple. Under 700px wide each row takes two lines: number, repository and title, then signals and Next. The info button in the header opens the legend drawer, which lists the colours, the rows, every signal in row order and the chains.
+Every open row has the same height and five columns: the number (a DRAFT tag on drafts), the repository and the branch it merges into (`web → main`), the title on one line (the full title in its tooltip), one signals row at most 220px wide that never wraps (signals that do not fit fold into a `+N` chip whose tooltip names each hidden one and its detail) and the Next step. Hovering a row lifts it and names its state. A draft's left bar is dashed. Merged rows are shorter and purple. Under 700px wide each row takes two lines: number, repository and title, then signals and Next. The info button in the header opens the legend drawer, which lists the colours, the rows, every signal in row order and the chains. The Auto / Light / Dark switch next to it sets the theme: Auto follows the system, the other two are remembered in the browser.
 
-The counters in the header (`● 2 ready to merge ● 3 ready to approve ● 8 something missing`) count the open PRs per colour; clicking one toggles that colour in the State filter.
+The counters in the header (`● 2 ready to merge ● 3 ready to approve ● 8 something missing`) count your open PRs per colour; clicking one toggles that colour in the State filter. The tab title shows how many are ready to merge, `(2) PR Board`. Clean up shows the number of merged PRs it would clear as a badge, and is disabled when there are none.
 
 ### Groups
 
-By default the rows are grouped by category: the first token in square brackets in the title (`[Checkout]`, `[Design system]`), each bracket split on `|`, skipping the repository's own name (`[web]`), issue keys (`[WEB-123]`) and `required:` lists. Categories are listed alphabetically and PRs without one go in **Untagged**, last. Each band shows the category, the repositories it spans and its colour counts; inside it the rows drop their own `[Category]` tag from the title.
+By default the rows are grouped by category: the first token in square brackets in the title (`[Checkout]`, `[Design system]`), each bracket split on `|`, skipping the repository's own name (`[web]`), issue keys (`[WEB-123]`) and `required:` lists. Categories are listed alphabetically and PRs without one go in **Untagged**, last. Each band shows the category, the repositories it spans, its colour counts and how many merged PRs are on the board; inside it the rows drop their own `[Category]` tag from the title. A band stays at the top of the window while you scroll through its group.
 
 The By category / By repo switch in the filter bar groups them per repository instead: the band shows `owner/repo → branch`, the colour counts and how many merged PRs are on the board, each row shows only `→ branch`, and the category is a pill after the signals. Click a band to collapse it.
+
+### To review
+
+Open PRs by others that request your review (`review-requested:@me` in the configured owners) sit in one compact band above the groups, in both views: number, repository, title, signals and the author. The band states how many there are; they are not in the colour counters or the "Showing N of M" count, never join a chain, and Clean up never touches them. When the review is no longer requested or the PR closes, it leaves the board on the next refresh.
 
 ### Chains
 
@@ -57,7 +61,7 @@ The signals always come in the same order, so each one sits in the same place on
 
 ### Filters
 
-The bar under the header filters the rows on the page: a search over number, title and branch, Repo, State and Category (with "No category") multi-selects, and a Show merged switch (off by default; each group then gets a "N merged" fold that opens its merged rows). A chain is shown whole when any PR in it matches, with the others dimmed, so the merge order stays visible; a group with nothing left hides. "Showing N of M open" counts the matching open PRs, and Clear resets everything.
+The bar under the header filters the rows on the page: a search over number, title and branch (`/` focuses it, Escape leaves it), Repo, State and Category (with "No category") multi-selects, and a Show merged switch (off by default; each group then gets a "N merged" fold that opens its merged rows). A chain is shown whole when any PR in it matches, with the others dimmed, so the merge order stays visible; a group with nothing left hides. "Showing N of M open" counts the matching open PRs, and Clear resets everything.
 
 The filters, the grouping and the collapsed groups live in the URL fragment, so a link reproduces the view:
 
@@ -124,8 +128,8 @@ Upgrading from pr-map: on the first run, when `~/.config/pr-board/config.json` o
 ## How it runs
 
 - **One server per machine.** `pr-board up` reuses the server named in the lock file after checking that its pid is alive and that `/api/health` on its port answers with that pid; otherwise it starts a new one detached. The server holds an exclusive `flock`, so two racing starts end with one server. It binds `127.0.0.1:7878` (the config's `port`), so a saved link keeps working across restarts, and falls back to a free port when that one is taken.
-- **Collecting.** On start, on Refresh and every 5 minutes: `gh search prs` for your open PRs and those merged in the last `merged_days`, then batched `gh api graphql` queries (15 PRs each) for review, check, merge and thread state. Merged PRs stay on the board until cleaned up; closed-unmerged ones leave it.
-- **Staying alive.** Start counts as a check-in, and so does every heartbeat: each Claude session's loop posts one every 3 minutes, and an open page posts one every 60 seconds (and re-fetches the board). The server exits `idle_minutes` after the last check-in and removes its lock file.
+- **Collecting.** On start, on Refresh and every 5 minutes: `gh search prs` for your open PRs, those merged in the last `merged_days` and the open PRs that request your review, then batched `gh api graphql` queries (15 PRs each) for review, check, merge and thread state. Merged PRs stay on the board until cleaned up; closed-unmerged ones leave it.
+- **Staying alive.** Start counts as a check-in, and so does every heartbeat: each Claude session's loop posts one every 3 minutes, and an open page posts one every 60 seconds and re-fetches the board every 5 minutes. The server exits `idle_minutes` after the last check-in and removes its lock file.
 - **Session check-in.** The SessionStart hook runs `pr-board up` for the session and starts a detached `pr-board session-loop`, which posts a heartbeat every 3 minutes and exits when `claude agents --json` no longer lists its session.
 
 ## Safety rules
@@ -146,4 +150,12 @@ Upgrading from pr-map: on the first run, when `~/.config/pr-board/config.json` o
 go vet ./... && go test ./...
 ```
 
-Tests cover the colour rules, the fixed signal order, chains across repositories, grouping by category and repository, the GraphQL parser on a recorded-shape fixture, collection merges, the Host/Origin/header guard, idle exit, singleton reuse and stale locks, the session loop's exit, loading an old store, moving the old pr-map files, the setup message, the demo board, and the cleanup skip rules on temporary git repositories with a fake `gh`.
+The README screenshots come from the demo board:
+
+```sh
+node scripts/shots.mjs     # builds pr-board, serves the demo on a free port, writes docs/screenshots/, stops it
+```
+
+It runs Playwright through `npx` (nothing is added to the repository) and needs its Chromium once: `npx playwright install chromium`. It prints the row heights per kind and any console error for each screenshot.
+
+Tests cover the colour rules, the fixed signal order, chains across repositories, grouping by category and repository, the GraphQL parser on a recorded-shape fixture, collection merges and the PRs to review, the Host/Origin/header guard, idle exit, singleton reuse and stale locks, the session loop's exit, loading an old store, moving the old pr-map files, the setup message, the demo board, and the cleanup skip rules on temporary git repositories with a fake `gh`, including a PR head that has to be fetched first.

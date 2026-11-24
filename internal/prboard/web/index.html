@@ -4,15 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PR Board</title>
+<script>try{const t=localStorage.getItem("pr-board-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Space+Grotesk:wght@600&display=swap">
 <style>
-:root{--bg:#f4f5f8;--surface:#fff;--fg:#1a2030;--muted:#5f6778;--line:#d9dde5;--trunk:#3a4256;--shade:rgba(15,20,30,.38);
-  --green:#1e8a4c;--amber:#a87406;--red:#c2352b;--purple:#7a4bd1;--focus:#2f62d0;
-  --display:"Space Grotesk",system-ui,sans-serif;--body:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;
-  color-scheme:light dark}
-@media (prefers-color-scheme:dark){:root{--bg:#11141a;--surface:#1a1e26;--fg:#e5e8ee;--muted:#9aa2b1;--line:#2c323d;--trunk:#aab3c5;--shade:rgba(0,0,0,.55);
-  --green:#4fcf86;--amber:#e8b44a;--red:#ff7b70;--purple:#b08cff;--focus:#7ea2ff}}
+/* each colour token is defined once as light-dark(light, dark); color-scheme
+   picks the side: the OS by default, or data-theme on <html> (the theme
+   switch). Registered as colours so their computed values are resolved. */
+@property --bg{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --surface{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --fg{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --muted{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --line{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --trunk{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --shade{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --lift{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --green{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --amber{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --red{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --purple{syntax:"<color>";inherits:true;initial-value:transparent}
+@property --focus{syntax:"<color>";inherits:true;initial-value:transparent}
+:root{color-scheme:light dark;
+  --bg:light-dark(#f4f5f8,#11141a);--surface:light-dark(#fff,#1a1e26);--fg:light-dark(#1a2030,#e5e8ee);--muted:light-dark(#5f6778,#9aa2b1);
+  --line:light-dark(#d9dde5,#2c323d);--trunk:light-dark(#3a4256,#aab3c5);--shade:light-dark(rgba(15,20,30,.38),rgba(0,0,0,.55));--lift:light-dark(rgba(15,20,30,.16),rgba(0,0,0,.5));
+  --green:light-dark(#1e8a4c,#4fcf86);--amber:light-dark(#a87406,#e8b44a);--red:light-dark(#c2352b,#ff7b70);--purple:light-dark(#7a4bd1,#b08cff);--focus:light-dark(#2f62d0,#7ea2ff);
+  --display:"Space Grotesk",system-ui,sans-serif;--body:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+:root[data-theme="light"]{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0;background:var(--bg)}
@@ -27,6 +45,7 @@ html,body{margin:0;background:var(--bg)}
 .pb-btn.pur{border-color:var(--purple);color:var(--purple)}
 .pb-btn:disabled{opacity:.45;cursor:default}
 .pb-btn.solid{background:var(--purple);border-color:var(--purple);color:#fff}
+.pb-btn .bdg{display:inline-block;min-width:20px;margin:0 3px;padding:0 6px;border-radius:999px;background:var(--purple);color:var(--surface);font:700 .78rem/18px var(--mono);text-align:center}
 .pb-icon{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);cursor:pointer}
 .pb-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .pb-clean{background:var(--surface);border:1px solid var(--purple);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:.88rem;display:grid;gap:8px}
@@ -94,7 +113,7 @@ html,body{margin:0;background:var(--bg)}
 /* board */
 .groups{display:grid;gap:18px}
 .empty{color:var(--muted)}
-.band{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--trunk);border-radius:8px;padding:6px 10px;cursor:pointer;min-width:0}
+.band{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--trunk);border-radius:8px;padding:6px 10px;cursor:pointer;min-width:0;box-shadow:0 6px 10px -8px var(--lift)}
 .band .car{color:var(--muted);flex:0 0 auto;width:1em;transition:transform .15s}
 .band[aria-expanded="false"] .car{transform:rotate(-90deg)}
 .band .name{font:600 1rem var(--display);white-space:nowrap}
@@ -104,8 +123,11 @@ html,body{margin:0;background:var(--bg)}
 .band .dots span{display:inline-flex;align-items:center;gap:4px}
 .band .dots i{width:8px;height:8px;border-radius:50%;display:inline-block}
 .band .dots .mg{color:var(--purple)}
+.band .dots .rvn{color:var(--muted)}
 .rows{margin-left:12px;padding:6px 0 2px 10px;border-left:2px solid var(--line);display:grid;gap:6px;min-width:0}
-.pr{--c:var(--muted);position:relative;min-width:0;height:42px;display:grid;grid-template-columns:112px 168px minmax(160px,1fr) minmax(0,max-content) minmax(140px,240px);align-items:center;gap:12px;padding:0 12px;background:color-mix(in srgb,var(--c) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--c) 32%,var(--line));border-left:5px solid var(--c);border-radius:7px;transition:opacity .15s}
+.pr{--c:var(--muted);position:relative;min-width:0;height:42px;display:grid;grid-template-columns:112px 168px minmax(160px,1fr) fit-content(220px) minmax(140px,240px);align-items:center;gap:12px;padding:0 12px;background:color-mix(in srgb,var(--c) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--c) 32%,var(--line));border-left:5px solid var(--c);border-radius:7px;transition:opacity .15s,transform .12s,box-shadow .12s}
+.pr:not(.merged):hover{transform:translateY(-1px);box-shadow:0 4px 10px -2px var(--lift)}
+@media (prefers-reduced-motion:reduce){.pr{transition:opacity .15s}.pr:not(.merged):hover{transform:none}}
 .pr>*{min-width:0;overflow:hidden;white-space:nowrap}
 .pr.ready{--c:var(--green)}.pr.approve{--c:var(--amber)}.pr.missing{--c:var(--red)}.pr.merged{--c:var(--purple)}
 .pr.draft{border-left-style:dashed}
@@ -129,7 +151,8 @@ html,body{margin:0;background:var(--bg)}
 .k-ok{--k:var(--green)}.k-bad{--k:var(--red)}.k-warn{--k:var(--amber)}.k-info{--k:var(--muted)}
 .next{font-size:.84rem;color:var(--muted);text-overflow:ellipsis}
 .next b{color:var(--fg);font-weight:600}
-.pr.merged{height:34px}
+.pr.merged,.pr.rv{height:34px}
+.pr.rv .next{font-size:.8rem}
 .pr.merged .ttl{color:var(--muted);font-weight:500}
 .pr.merged .ml{font-size:.78rem;font-weight:600;color:var(--purple)}
 .fold{font:600 .82rem var(--body);color:var(--purple);background:none;border:0;padding:2px 0;cursor:pointer;justify-self:start}
@@ -171,6 +194,7 @@ html,body{margin:0;background:var(--bg)}
     <span class="when" id="pb-when">loading…</span>
     <div class="pb-ctr" id="pb-ctr" role="group" aria-label="Filter by colour" hidden></div>
     <span class="sp"></span>
+    <span class="pb-gb" id="pb-theme" role="group" aria-label="Theme"><button type="button" data-t="auto" aria-pressed="true" title="Follow the system">Auto</button><button type="button" data-t="light" aria-pressed="false">Light</button><button type="button" data-t="dark" aria-pressed="false">Dark</button></span>
     <button class="pb-icon" id="pb-legend-btn" type="button" aria-label="Legend" aria-haspopup="dialog" aria-expanded="false" aria-controls="pb-legend" title="Legend"><svg aria-hidden="true"><use href="#i-info"/></svg></button>
     <button class="pb-btn" id="pb-refresh" type="button">Refresh</button>
     <button class="pb-btn pur" id="pb-cleanup" type="button" disabled>Clean up</button>
@@ -178,7 +202,7 @@ html,body{margin:0;background:var(--bg)}
   <div class="pb-clean" id="pb-cleanbox" hidden></div>
   <div class="pb-err" id="pb-err" hidden></div>
   <div class="pb-bar" id="pb-bar" role="search" aria-label="Filter PRs" hidden>
-    <input class="pb-q" id="pb-q" type="search" placeholder="Search number, title, branch" aria-label="Search number, title or branch" autocomplete="off">
+    <input class="pb-q" id="pb-q" type="search" placeholder="Search number, title, branch  ( / )" aria-label="Search number, title or branch" autocomplete="off">
     <details class="pb-dd" data-f="repo"><summary>Repo <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="Repo"></div></details>
     <details class="pb-dd" data-f="state"><summary>State <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="State"></div></details>
     <details class="pb-dd" data-f="cat"><summary>Category <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="Category"></div></details>
@@ -199,6 +223,7 @@ html,body{margin:0;background:var(--bg)}
   <h3>Rows</h3>
   <ul>
     <li><span class="tag">#N</span><span>One row per open PR</span><small>Number, repository and the branch it merges into, title, signals and Next. The left bar is the colour; hover a row for its state.</small></li>
+    <li><span class="tag">REVIEW</span><span>To review</span><small>Teammates' open PRs that request your review, in a compact band at the top with their author. They are not in the counters and Clean up never touches them.</small></li>
     <li><span class="cat">Checkout</span><span>Grouped by category</span><small>The first <code>[tag]</code> in the title; PRs without one are in Untagged, last. By repo groups them per repository instead, with the category as a pill.</small></li>
   </ul>
   <h3>Signals, in row order</h3>
@@ -261,6 +286,23 @@ html,body{margin:0;background:var(--bg)}
     }
   });
 
+  // ---- theme: Auto follows the OS; Light and Dark are saved in localStorage
+  function setTheme(t){
+    const root=document.documentElement;
+    if(t==="light"||t==="dark")root.dataset.theme=t;else{t="auto";delete root.dataset.theme}
+    try{t==="auto"?localStorage.removeItem("pr-board-theme"):localStorage.setItem("pr-board-theme",t)}catch(e){}
+    document.querySelectorAll("#pb-theme button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.t===t)));
+  }
+  setTheme(document.documentElement.dataset.theme||"auto");
+  document.querySelectorAll("#pb-theme button").forEach(b=>b.addEventListener("click",()=>setTheme(b.dataset.t)));
+
+  // ---- "/" focuses the search, Escape leaves it
+  document.addEventListener("keydown",e=>{
+    const a=document.activeElement,typing=a&&(a.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+    if(e.key==="/"&&!typing&&drawer.hidden&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!$("pb-bar").hidden){e.preventDefault();$("pb-q").focus();$("pb-q").select()}
+    else if(e.key==="Escape"&&a===$("pb-q")){e.preventDefault();$("pb-q").blur()}
+  });
+
   // ---- rows
   // a repo goes by its name, or owner/name when two owners share a name
   let names={};
@@ -281,6 +323,7 @@ html,body{margin:0;background:var(--bg)}
     const attrs=`data-key="${esc(c.key)}" data-parent="${esc(c.parent||"")}" data-depth="${depth||0}" data-chain="${esc(chain)}" data-group="${esc(gid)}" data-n="${esc(c.n)}" data-repo="${esc(s)}" data-state="${esc(c.state)}" data-cat="${esc(c.category||NONE)}" data-text="${esc(text)}"`;
     const head=`<div class="hd"><a class="num" href="${esc(safeURL(c.url))}" target="_blank" rel="noopener">#${esc(c.n)}</a>${c.draft?`<span class="tag" title="Draft">DRAFT</span>`:""}</div>${rp}<div class="ttl" title="${esc(c.title)}">${esc(shownTitle(c,by))}</div>`;
     if(!open)return `<article class="pr merged" ${attrs} title="${esc(c.label)}">${head}<div class="sig"><span class="ml">${esc(c.label)}</span></div><div class="next"></div></article>`;
+    if(by==="review")return `<article class="pr rv ${esc(c.state)}${c.draft?" draft":""}" ${attrs} title="${esc(c.label)}">${head}<div class="sig">${(c.signals||[]).map(s=>ic(s.k,s.n,s.title,s.text)).join("")}</div><div class="next" title="Author">${c.author?`by <b>${esc(c.author)}</b>`:""}</div></article>`;
     const after=c.after?`<span class="after" title="${c.link==="stack"?"Stacked on":"Required first"}: ${esc(c.parent)}">${esc(c.after)}</span>`:"";
     const cat=by==="repo"&&c.category?`<span class="cat" title="Category: ${esc(c.category)}">${esc(c.category)}</span>`:"";
     return `<article class="pr ${esc(c.state)}${c.draft?" draft":""}${depth?" sub":""}" ${attrs} title="${esc(c.label)}">${head}<div class="sig">${after}${(c.signals||[]).map(s=>ic(s.k,s.n,s.title,s.text)).join("")}${cat}</div><div class="next" title="${esc(c.next||"")}">${c.next?`<b>Next:</b> ${esc(c.next)}`:""}</div></article>`;
@@ -371,8 +414,8 @@ html,body{margin:0;background:var(--bg)}
   function apply(){
     let shown=0,total=0,anyGroup=false;
     document.querySelectorAll("#pb-groups section.group").forEach(sec=>{
-      const rows=[...sec.querySelectorAll(".pr:not(.merged)")],hit={};
-      rows.forEach(r=>{const m=matches(r,true);r._m=m;total++;if(m){shown++;hit[r.dataset.chain]=true}});
+      const rows=[...sec.querySelectorAll(".pr:not(.merged)")],hit={},counted=!sec.classList.contains("review");
+      rows.forEach(r=>{const m=matches(r,true);r._m=m;if(counted)total++;if(m){if(counted)shown++;hit[r.dataset.chain]=true}});
       let visible=0;
       rows.forEach(r=>{const on=!!hit[r.dataset.chain];r.hidden=!on;if(on)visible++;r.classList.toggle("dim",on&&!r._m)});
       // merged PRs ignore the State filter: Show merged is their switch
@@ -435,19 +478,27 @@ html,body{margin:0;background:var(--bg)}
     const title=by==="repo"
       ?`<span class="rn">${esc(g.key)}</span><small>→ ${esc(g.branch||"?")}</small>`
       :`<span class="name">${esc(g.key||"Untagged")}</span><small>${esc((g.repos||[]).map(short).join(" · "))}</small>`;
-    const mg=by==="repo"?`<span class="mg" title="Merged in the last days, until Clean up">${merged.length} merged</span>`:"";
+    const mg=`<span class="mg" title="Merged in the last days, until Clean up">${merged.length} merged</span>`;
     let chain="";
     const body=rows.map(r=>{if(!r.depth)chain=r.key;return row(r,by,r.depth,chain,gid)}).join("")+
       merged.map(m=>row(m,by,0,m.key,gid)).join("")+(merged.length?`<button class="fold" type="button"></button>`:"");
     return `<section class="group" data-gid="${esc(gid)}"><button class="band" type="button" aria-expanded="true"><span class="car" aria-hidden="true">▾</span>${title}<span class="dots">${dots(counts(rows))}${mg}</span></button>
       <div class="rows${openMerged.has(by+":"+gid)?" mopen":""}">${body}</div></section>`;
   }
+  // teammates' PRs that ask for a review: one compact band above the groups
+  function reviewHTML(g){
+    const rows=g&&g.rows||[];
+    if(!rows.length)return "";
+    const gid="~review",body=rows.map(r=>row(r,"review",0,r.key,gid)).join("");
+    return `<section class="group review" data-gid="${gid}"><button class="band" type="button" aria-expanded="true"><span class="car" aria-hidden="true">▾</span><span class="name">To review</span><small>${esc((g.repos||[]).map(short).join(" · "))}</small><span class="dots"><span class="rvn" title="Not counted in the colour counters">${rows.length} to review</span></span></button>
+      <div class="rows">${body}</div></section>`;
+  }
   function render(v){
     view=v;
     const t=v.refreshed&&!v.refreshed.startsWith("0001")?new Date(v.refreshed).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"never";
     $("pb-when").textContent=`${v.open} open · ${v.merged} merged · refreshed ${t}`;
     const btn=$("pb-cleanup");
-    btn.disabled=!v.merged; btn.textContent=v.merged?`Clean up ${v.merged} merged`:"Nothing to clean up";
+    btn.disabled=!v.merged; btn.innerHTML=v.merged?`Clean up <span class="bdg">${esc(v.merged)}</span> merged`:"Clean up";
     const err=$("pb-err"); err.hidden=!(v.errors&&v.errors.length); err.textContent=(v.errors||[]).join(" · ");
     const repos=v.repos||[],by=f.group,groups=(by==="repo"?repos:v.categories)||[];
     $("pb-bar").hidden=!!v.setup||!repos.length;
@@ -459,8 +510,9 @@ html,body{margin:0;background:var(--bg)}
     repos.forEach(r=>(r.rows||[]).concat(r.merged||[]).forEach(c=>{if(c.category)cats.add(c.category)}));
     buildMenus({repos:repos.map(r=>short(r.key)).sort(),cats:[...cats].sort((a,b)=>a.localeCompare(b))});
     const c=counts(all);
+    document.title=c.ready?`(${c.ready}) PR Board`:"PR Board";
     $("pb-ctr").innerHTML=STATES.map(s=>`<button type="button" data-k="${s[0]}" aria-pressed="false" title="Show only: ${esc(s[2])}"><i style="background:var(--${s[1]})"></i><b>${c[s[0]]}</b> ${esc(s[2].toLowerCase())}</button>`).join("");
-    $("pb-groups").innerHTML=groups.length?groups.map(g=>groupHTML(g,by)).join("")+`<p class="empty" id="pb-nomatch" hidden>No PR matches these filters. <button class="pb-clear" type="button" data-clear>Clear</button></p>`
+    $("pb-groups").innerHTML=groups.length||v.to_review?reviewHTML(v.review)+groups.map(g=>groupHTML(g,by)).join("")+`<p class="empty" id="pb-nomatch" hidden>No PR matches these filters. <button class="pb-clear" type="button" data-clear>Clear</button></p>`
       :`<p class="empty">No PRs yet. Refresh runs on start and every 5 minutes.</p>`;
     document.querySelectorAll("#pb-groups section.group").forEach(sec=>{
       const gid=sec.dataset.gid;
@@ -524,7 +576,10 @@ html,body{margin:0;background:var(--bg)}
   if(document.fonts)document.fonts.ready.then(()=>fitSignals($("pb-groups")));
   readHash();
   load();beat();
-  setInterval(()=>{beat();load()},60000);
+  // the heartbeat keeps the server alive (it exits idle_minutes after the
+  // last one); the board itself reloads every 5 minutes, as the server collects
+  setInterval(beat,60000);
+  setInterval(load,300000);
 })();
 </script>
 </body>

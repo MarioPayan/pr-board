@@ -2,7 +2,6 @@ package prboard
 
 import (
 	"cmp"
-	"fmt"
 	"slices"
 	"time"
 )
@@ -17,217 +16,228 @@ type Store struct {
 
 // Card is one PR as the page draws it.
 type Card struct {
-	Key   string `json:"key"`
-	Repo  string `json:"repo"`
-	N     int    `json:"n"`
-	URL   string `json:"url"`
-	Title string `json:"title"`
-	Head  string `json:"head"`           // the PR's branch, for the page's search
-	Base  string `json:"base,omitempty"` // set when it is neither the default branch nor a PR in the lane
+	Key    string `json:"key"`
+	Repo   string `json:"repo"`
+	N      int    `json:"n"`
+	URL    string `json:"url"`
+	Title  string `json:"title"`
+	Head   string `json:"head"`             // the PR's branch, for the page's search
+	Base   string `json:"base"`             // the branch it merges into
+	Parent string `json:"parent,omitempty"` // key of the open PR it waits on
+	Link   string `json:"link,omitempty"`   // "stack" (base branch) or "required" ([required:] in the body)
+	After  string `json:"after,omitempty"`  // "after #N" or "after repo#N", naming Parent
 	Derived
 }
 
-// Item is a lane element: a card, a link between two cards, or a reference
-// to the card a lane branches from.
-type Item struct {
-	Card *Card  `json:"card,omitempty"`
-	Link string `json:"link,omitempty"` // "stack" (base branch) or "required" ([required:] in the body); both solid
-	Ref  string `json:"ref,omitempty"`  // "#123": the lane hangs off that card
+// Row is an open card in a group's display order. Depth is the number of
+// its ancestors shown above it in the same group: 0 starts a chain.
+type Row struct {
+	Card
+	Depth int `json:"depth"`
 }
 
-// RepoView is one trunk.
-type RepoView struct {
-	Repo   string   `json:"repo"`
-	Branch string   `json:"branch"`
-	Lanes  [][]Item `json:"lanes"`
+// Group is one band of the board: a category or a repository.
+type Group struct {
+	Key    string   `json:"key"`              // category ("" for Untagged) or owner/name
+	Repos  []string `json:"repos"`            // the repositories its PRs live in
+	Branch string   `json:"branch,omitempty"` // a repository group's default branch
+	Rows   []Row    `json:"rows"`
 	Merged []Card   `json:"merged"`
 }
 
-// View is GET /api/prs.
+// View is GET /api/prs. Categories and Repos hold the same PRs, grouped
+// two ways; the page shows one of them.
 type View struct {
-	Refreshed time.Time  `json:"refreshed,omitzero"`
-	Open      int        `json:"open"`
-	Merged    int        `json:"merged"`
-	Errors    []string   `json:"errors,omitempty"`
-	Setup     string     `json:"setup,omitempty"` // the config file to edit when it names no owners
-	Repos     []RepoView `json:"repos"`
+	Refreshed  time.Time `json:"refreshed,omitzero"`
+	Open       int       `json:"open"`
+	Merged     int       `json:"merged"`
+	Errors     []string  `json:"errors,omitempty"`
+	Setup      string    `json:"setup,omitempty"` // the config file to edit when it names no owners
+	Categories []Group   `json:"categories"`      // alphabetical, Untagged last
+	Repos      []Group   `json:"repos"`           // most open PRs first
 }
 
-// BuildView lays the store out as trunks and lanes.
+// BuildView chains the open PRs and groups the store by category and by repository.
 func BuildView(s *Store, now time.Time) View {
-	v := View{Refreshed: s.Refreshed, Errors: s.Errors, Repos: []RepoView{}}
-	byRepo := map[string][]PR{}
-	open := map[string]PR{} // key -> PR, open only
+	v := View{Refreshed: s.Refreshed, Errors: s.Errors, Categories: []Group{}, Repos: []Group{}}
+	var open []PR
+	var merged []Card
+	branch := map[string]string{}
 	for _, p := range s.PRs {
-		byRepo[p.Repo] = append(byRepo[p.Repo], p)
-		if p.State == "OPEN" {
-			open[p.Key()] = p
+		if branch[p.Repo] == "" {
+			branch[p.Repo] = p.DefaultBranch
+		}
+		switch p.State {
+		case "OPEN":
+			open = append(open, p)
 			v.Open++
-		} else if p.State == "MERGED" {
+		case "MERGED":
+			merged = append(merged, makeCard(p, now))
 			v.Merged++
 		}
 	}
-	for repo, prs := range byRepo {
-		rv := RepoView{Repo: repo, Lanes: [][]Item{}, Merged: []Card{}}
-		for _, p := range prs {
-			if p.DefaultBranch != "" {
-				rv.Branch = p.DefaultBranch
-				break
+	cards := chainCards(open, now)
+	v.Categories = groupBy(cards, merged, func(c Card) string { return c.Category })
+	slices.SortStableFunc(v.Categories, func(a, b Group) int {
+		if (a.Key == "") != (b.Key == "") { // Untagged last
+			if a.Key == "" {
+				return 1
 			}
+			return -1
 		}
-		var openPRs []PR
-		for _, p := range prs {
-			if p.State == "OPEN" {
-				openPRs = append(openPRs, p)
-			} else if p.State == "MERGED" {
-				rv.Merged = append(rv.Merged, makeCard(p, now))
-			}
-		}
-		slices.SortFunc(rv.Merged, func(a, b Card) int { return cmp.Compare(b.N, a.N) })
-		if l := lanes(openPRs, now); l != nil {
-			rv.Lanes = l
-		}
-		if len(rv.Lanes) == 0 && len(rv.Merged) == 0 {
-			continue
-		}
-		v.Repos = append(v.Repos, rv)
+		return cmp.Compare(a.Key, b.Key)
+	})
+	v.Repos = groupBy(cards, merged, func(c Card) string { return c.Repo })
+	for i := range v.Repos {
+		v.Repos[i].Branch = branch[v.Repos[i].Key]
 	}
-	slices.SortFunc(v.Repos, func(a, b RepoView) int {
-		if c := cmp.Compare(laneCount(b), laneCount(a)); c != 0 {
+	slices.SortStableFunc(v.Repos, func(a, b Group) int {
+		if c := cmp.Compare(len(b.Rows), len(a.Rows)); c != 0 {
 			return c
 		}
-		return cmp.Compare(a.Repo, b.Repo)
+		return cmp.Compare(a.Key, b.Key)
 	})
 	return v
 }
 
-func laneCount(r RepoView) int {
-	n := 0
-	for _, l := range r.Lanes {
-		for _, it := range l {
-			if it.Card != nil {
-				n++
-			}
-		}
-	}
-	return n
-}
-
 func makeCard(p PR, now time.Time) Card {
-	return Card{Key: p.Key(), Repo: p.Repo, N: p.Number, URL: p.URL, Title: p.Title, Head: p.Head, Derived: Derive(p, now)}
+	return Card{Key: p.Key(), Repo: p.Repo, N: p.Number, URL: p.URL, Title: p.Title, Head: p.Head, Base: p.Base, Derived: Derive(p, now)}
 }
 
-// lanes chains open PRs of one repo: a PR follows the PR whose head branch is
-// its base, or else the first open PR of the lane its [required:] list names.
-// That required PR's chip is dropped from the card, since the link shows it.
-// A PR with several followers starts one lane per extra follower, headed by
-// a reference to it.
-func lanes(prs []PR, now time.Time) [][]Item {
-	byHead := map[string]PR{}
-	byNum := map[int]PR{}
-	for _, p := range prs {
-		byHead[p.Head] = p
-		byNum[p.Number] = p
+// byRepoThenNewest orders cards by repository, then newest PR first.
+func byRepoThenNewest(a, b Card) int {
+	if c := cmp.Compare(a.Repo, b.Repo); c != 0 {
+		return c
 	}
-	parent := map[int]int{}
-	kind := map[int]string{}
-	for _, p := range prs {
-		if q, ok := byHead[p.Base]; ok && q.Number != p.Number && p.Base != p.DefaultBranch {
-			parent[p.Number], kind[p.Number] = q.Number, "stack"
+	return cmp.Compare(b.N, a.N)
+}
+
+// chainCards gives every open PR its parent: the open PR of the same
+// repository whose head branch is its base, or else the first open PR on the
+// board, in any repository, that its [required:] list names. A link that
+// would close a loop is skipped. The parent's required chip is dropped from
+// the card, since the chain shows it.
+func chainCards(prs []PR, now time.Time) []Card {
+	prs = slices.Clone(prs)
+	slices.SortFunc(prs, func(a, b PR) int { // oldest first, so a stack loop keeps the older link
+		if c := cmp.Compare(a.Repo, b.Repo); c != 0 {
+			return c
 		}
+		return cmp.Compare(a.Number, b.Number)
+	})
+	byKey := map[string]PR{}
+	byHead := map[[2]string]PR{}
+	for _, p := range prs {
+		byKey[p.Key()] = p
+		byHead[[2]string{p.Repo, p.Head}] = p
 	}
-	isAncestor := func(a, b int) bool { // a is b or an ancestor of b
-		for seen := 0; seen <= len(prs); seen++ {
-			if a == b {
+	parent, link := map[string]string{}, map[string]string{}
+	loops := func(child, to string) bool { // child is to or an ancestor of to
+		for range len(prs) + 1 {
+			if to == child {
 				return true
 			}
-			nb, ok := parent[b]
+			next, ok := parent[to]
 			if !ok {
 				return false
 			}
-			b = nb
+			to = next
 		}
-		return true // cycle: treat as related
+		return true
 	}
 	for _, p := range prs {
-		if _, ok := parent[p.Number]; ok {
+		q, ok := byHead[[2]string{p.Repo, p.Base}]
+		if ok && p.Base != p.DefaultBranch && !loops(p.Key(), q.Key()) {
+			parent[p.Key()], link[p.Key()] = q.Key(), "stack"
+		}
+	}
+	for _, p := range prs {
+		if _, ok := parent[p.Key()]; ok {
 			continue
 		}
 		for _, r := range p.Requires {
-			if r.Repo != p.Repo || r.N == p.Number {
+			if _, ok := byKey[r.Key()]; !ok || loops(p.Key(), r.Key()) {
 				continue
 			}
-			if _, ok := byNum[r.N]; !ok || isAncestor(p.Number, r.N) {
-				continue
-			}
-			parent[p.Number], kind[p.Number] = r.N, "required"
+			parent[p.Key()], link[p.Key()] = r.Key(), "required"
 			break
 		}
 	}
-	children := map[int][]int{}
-	var roots []int
+	cards := make([]Card, 0, len(prs))
 	for _, p := range prs {
-		if q, ok := parent[p.Number]; ok {
-			children[q] = append(children[q], p.Number)
-		} else {
-			roots = append(roots, p.Number)
-		}
-	}
-	desc := func(a, b int) int { return cmp.Compare(b, a) }
-	slices.SortFunc(roots, desc)
-	for k := range children {
-		slices.SortFunc(children[k], desc)
-	}
-	card := func(n int) *Card {
-		p := byNum[n]
 		c := makeCard(p, now)
-		if p.Base != p.DefaultBranch && kind[n] != "stack" {
-			c.Base = p.Base
+		if q, ok := parent[c.Key]; ok {
+			pp := byKey[q]
+			c.Parent, c.Link, c.After = q, link[c.Key], "after "+shortRef(pp.Repo, p.Repo, pp.Number)
+			c.Signals = slices.DeleteFunc(c.Signals, func(s Signal) bool { return s.Ref == q })
 		}
-		if kind[n] == "required" {
-			linked := fmt.Sprintf("%s#%d", p.Repo, parent[n])
-			c.Signals = slices.DeleteFunc(c.Signals, func(s Signal) bool { return s.Ref == linked })
-		}
-		return &c
+		cards = append(cards, c)
 	}
-	var out [][]Item
-	seen := map[int]bool{}
-	var walk func(n int, lane []Item)
-	walk = func(n int, lane []Item) {
-		seen[n] = true
-		lane = append(slices.Clone(lane), Item{Card: card(n)})
-		var kids []int
-		for _, k := range children[n] {
-			if !seen[k] {
-				kids = append(kids, k)
+	return cards
+}
+
+// groupBy splits cards into groups by key and orders each group's rows as
+// chains: a card whose parent is in the same group comes right after its
+// parent's earlier children and their own children, one level deeper.
+func groupBy(open, merged []Card, key func(Card) string) []Group {
+	idx := map[string]int{}
+	groups := []Group{}
+	at := func(k string) *Group {
+		i, ok := idx[k]
+		if !ok {
+			i = len(groups)
+			idx[k] = i
+			groups = append(groups, Group{Key: k, Repos: []string{}, Rows: []Row{}, Merged: []Card{}})
+		}
+		return &groups[i]
+	}
+	members := map[string][]Card{}
+	for _, c := range open {
+		at(key(c))
+		members[key(c)] = append(members[key(c)], c)
+	}
+	for _, c := range merged {
+		g := at(key(c))
+		g.Merged = append(g.Merged, c)
+	}
+	for i := range groups {
+		g := &groups[i]
+		cs := slices.Clone(members[g.Key])
+		slices.SortFunc(cs, byRepoThenNewest)
+		in := map[string]bool{}
+		for _, c := range cs {
+			in[c.Key] = true
+		}
+		children := map[string][]Card{}
+		var roots []Card
+		for _, c := range cs {
+			if in[c.Parent] {
+				children[c.Parent] = append(children[c.Parent], c)
+			} else {
+				roots = append(roots, c)
 			}
 		}
-		if len(kids) == 0 {
-			out = append(out, lane)
-			return
-		}
-		walk(kids[0], append(lane, Item{Link: kind[kids[0]]}))
-		for _, k := range kids[1:] {
-			if !seen[k] {
-				walk(k, []Item{{Ref: fmt.Sprintf("#%d", n)}, {Link: kind[k]}})
+		var walk func(c Card, depth int)
+		walk = func(c Card, depth int) {
+			g.Rows = append(g.Rows, Row{Card: c, Depth: depth})
+			for _, k := range children[c.Key] {
+				walk(k, depth+1)
 			}
 		}
-	}
-	for _, r := range roots {
-		walk(r, nil)
-	}
-	// stacks that loop back on themselves have no root; start them anywhere
-	rest := make([]int, 0)
-	for _, p := range prs {
-		if !seen[p.Number] {
-			rest = append(rest, p.Number)
+		for _, r := range roots {
+			walk(r, 0)
 		}
-	}
-	slices.SortFunc(rest, desc)
-	for _, n := range rest {
-		if !seen[n] {
-			walk(n, nil)
+		slices.SortFunc(g.Merged, byRepoThenNewest)
+		spans := cs // the repos of its open PRs; of its merged ones when none is open
+		if len(spans) == 0 {
+			spans = g.Merged
 		}
+		for _, c := range spans {
+			if !slices.Contains(g.Repos, c.Repo) {
+				g.Repos = append(g.Repos, c.Repo)
+			}
+		}
+		slices.Sort(g.Repos)
 	}
-	return out
+	return groups
 }

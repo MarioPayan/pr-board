@@ -110,8 +110,8 @@ func TestDemoServesTheFictionalBoard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v.Open < 10 || v.Merged < 4 || v.Setup != "" || len(v.Repos) != 4 || !strings.HasPrefix(v.Repos[0].Repo, "acme/") {
-		t.Errorf("demo view: open %d merged %d setup %q repos %d", v.Open, v.Merged, v.Setup, len(v.Repos))
+	if v.Open < 10 || v.Merged < 4 || v.Setup != "" || len(v.Repos) != 4 || len(v.Categories) != 5 || !strings.HasPrefix(v.Repos[0].Key, "acme/") {
+		t.Errorf("demo view: open %d merged %d setup %q repos %d categories %d", v.Open, v.Merged, v.Setup, len(v.Repos), len(v.Categories))
 	}
 	cancel()
 	if err := <-done; err != nil {

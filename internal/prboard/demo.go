@@ -8,7 +8,9 @@ import (
 // DemoStore is a fictional board for `pr-board demo`, the screenshots and
 // the page tests: the org acme with four repositories, every colour at
 // least twice, a same-repo [required:] chain, a stacked branch, a
-// cross-repo requirement, a repo whose default branch is production,
+// cross-repo requirement on the board (a chain across repos in one
+// category), one on a PR that is not, PRs without a category, a repo
+// whose default branch is production,
 // merged PRs, every signal at least once (a dismissed approval, a requested
 // team) and one card whose signals overflow into "+N".
 func DemoStore(now time.Time) *Store {
@@ -85,6 +87,7 @@ func DemoStore(now time.Time) *Store {
 		pr("infra", 60, "Pin the base image digest", func(p *PR) { p.MergeState = "BLOCKED" }),
 		pr("infra", 57, "Raise the worker pool to 8", func(p *PR) {
 			p.ChecksPending = 3
+			p.Body = "[required:acme/web#430]"
 		}),
 		pr("infra", 55, "[Search] Rebuild the index every night", func(p *PR) {
 			unapproved(p, "bob")
@@ -93,8 +96,9 @@ func DemoStore(now time.Time) *Store {
 		pr("infra", 52, "Rotate the staging certificates", merged),
 	}
 	// a requirement takes the state of the PR it names: one on the board,
-	// web#399 closed without merging, anything else not found
-	state := map[string]string{"acme/web#399": "CLOSED"}
+	// web#399 closed without merging, web#430 open (someone else's PR),
+	// anything else not found
+	state := map[string]string{"acme/web#399": "CLOSED", "acme/web#430": "OPEN"}
 	for i := range prs {
 		state[prs[i].Key()] = prs[i].State
 		if prs[i].Repo == "acme/infra" {

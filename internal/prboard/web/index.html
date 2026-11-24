@@ -75,49 +75,76 @@ html,body{margin:0;background:var(--bg)}
 .pb-drawer li{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:start;font-size:.86rem}
 .pb-drawer li small{grid-column:2;color:var(--muted);font-size:.8rem}
 .pb-drawer .sw{width:14px;height:14px;border-radius:3px;margin-top:3px}
-.pb-drawer .ln{width:26px;height:2px;background:var(--trunk);margin-top:10px}
-.pb-drawer .ic,.pb-drawer .tag{justify-self:start}
+.pb-drawer .bar{width:5px;height:20px;border-radius:2px;margin:1px 4px 0}
+.pb-drawer .elb{width:16px;height:14px;border-left:2px solid var(--trunk);border-bottom:2px solid var(--trunk);border-bottom-left-radius:6px;margin:0 0 6px 4px}
+.pb-drawer .after{justify-self:start;margin-top:1px}
+.pb-drawer .ic,.pb-drawer .tag,.pb-drawer .cat{justify-self:start}
 .pb-drawer .dash{width:0;height:20px;border-left:5px dashed var(--muted);margin-left:4px}
 
+/* header counters and the group switch */
+.pb-ctr{display:flex;flex-wrap:wrap;gap:6px}
+.pb-ctr button{display:inline-flex;align-items:center;gap:6px;font:600 .8rem var(--body);border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:4px 11px;cursor:pointer;white-space:nowrap}
+.pb-ctr button i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.pb-ctr button b{font:700 .9rem var(--mono)}
+.pb-ctr button[aria-pressed="true"]{border-color:var(--fg);box-shadow:inset 0 0 0 1px var(--fg)}
+.pb-gb{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;height:32px}
+.pb-gb button{font:600 .82rem var(--body);border:0;background:var(--surface);color:var(--muted);padding:0 10px;cursor:pointer;white-space:nowrap}
+.pb-gb button[aria-pressed="true"]{background:var(--fg);color:var(--surface)}
+
 /* board */
-.repos{display:grid;gap:24px}
+.groups{display:grid;gap:18px}
 .empty{color:var(--muted)}
-.branch{display:inline-flex;flex-direction:column;border:2px solid var(--trunk);border-radius:8px;padding:6px 12px;background:var(--surface)}
-.branch small{color:var(--muted);font-size:.75rem}
-.branch b{font-family:var(--mono);font-size:.95rem}
-.lanes{position:relative;margin-left:22px;border-left:3px solid var(--trunk);padding:14px 0 6px;display:grid;gap:10px}
-.lanes::before{content:"";position:absolute;left:-9px;top:-1px;border:7.5px solid transparent;border-bottom:10px solid var(--trunk);border-top:0}
-.lane{display:flex;align-items:center;min-width:0;overflow-x:auto}
-.conn{flex:0 0 34px;height:2px;background:var(--trunk);position:relative}
-.conn::before{content:"";position:absolute;left:-1px;top:-5px;border:6px solid transparent;border-right:8px solid var(--trunk);border-left:0}
-.ref{font:600 .8rem var(--mono);color:var(--muted);border:1px dashed var(--line);border-radius:6px;padding:2px 6px;margin-left:10px;flex:0 0 auto}
-.pr{--c:var(--muted);flex:1 1 300px;max-width:520px;min-width:230px;background:color-mix(in srgb,var(--c) 9%,var(--surface));border:1px solid color-mix(in srgb,var(--c) 35%,var(--line));border-left:5px solid var(--c);border-radius:7px;padding:9px 12px;display:grid;grid-template-columns:minmax(0,1fr);gap:6px;transition:opacity .15s}
-.pr>*{height:22px;min-width:0;overflow:hidden;white-space:nowrap}
+.band{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--trunk);border-radius:8px;padding:6px 10px;cursor:pointer;min-width:0}
+.band .car{color:var(--muted);flex:0 0 auto;width:1em;transition:transform .15s}
+.band[aria-expanded="false"] .car{transform:rotate(-90deg)}
+.band .name{font:600 1rem var(--display);white-space:nowrap}
+.band .rn{font:700 .9rem var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.band small{color:var(--muted);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.band .dots{display:flex;gap:10px;margin-left:auto;font:600 .78rem var(--mono);flex:0 0 auto}
+.band .dots span{display:inline-flex;align-items:center;gap:4px}
+.band .dots i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.band .dots .mg{color:var(--purple)}
+.rows{margin-left:12px;padding:6px 0 2px 10px;border-left:2px solid var(--line);display:grid;gap:6px;min-width:0}
+.pr{--c:var(--muted);position:relative;min-width:0;height:42px;display:grid;grid-template-columns:112px 168px minmax(160px,1fr) minmax(0,max-content) minmax(140px,240px);align-items:center;gap:12px;padding:0 12px;background:color-mix(in srgb,var(--c) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--c) 32%,var(--line));border-left:5px solid var(--c);border-radius:7px;transition:opacity .15s}
+.pr>*{min-width:0;overflow:hidden;white-space:nowrap}
 .pr.ready{--c:var(--green)}.pr.approve{--c:var(--amber)}.pr.missing{--c:var(--red)}.pr.merged{--c:var(--purple)}
+.pr.draft{border-left-style:dashed}
 .pr.dim{opacity:.38}
-.hd{display:flex;align-items:center;gap:8px}
-.hd>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pr.sub{margin-left:28px}
+.pr.sub::before{content:"";position:absolute;left:-21px;top:-7px;width:16px;height:28px;border-left:2px solid var(--trunk);border-bottom:2px solid var(--trunk);border-bottom-left-radius:6px}
+.hd{display:flex;align-items:center;gap:6px}
 .num{font:600 .9rem var(--mono);flex:0 0 auto}
-.st{font-size:.72rem;font-weight:600;color:var(--c);text-transform:uppercase;letter-spacing:.05em;flex:0 1 auto}
-.base{font:500 .72rem var(--mono);color:var(--muted);flex:0 1 auto}
-.cat{font-size:.72rem;line-height:18px;border:1px solid var(--line);border-radius:999px;padding:0 7px;color:var(--muted);margin-left:auto;flex:0 1 auto}
-.ttl{font-weight:600;line-height:22px;text-overflow:ellipsis}
+.rp{font:600 .76rem var(--mono);color:var(--muted);text-overflow:ellipsis}
+.rp em{font-style:normal;opacity:.75}
+.ttl{font-weight:600;text-overflow:ellipsis}
 .sig{display:flex;flex-wrap:nowrap;align-items:center;gap:4px}
+.after{font:600 .76rem var(--mono);color:var(--muted);white-space:nowrap;flex:0 0 auto;padding-right:2px}
+.cat{font-size:.72rem;line-height:18px;border:1px solid var(--line);border-radius:999px;padding:0 7px;color:var(--muted);flex:0 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .ic{display:inline-flex;flex:0 0 auto;align-items:center;gap:3px;height:22px;font:600 .78rem var(--mono);padding:0 6px;border:1px solid transparent;border-radius:6px;color:var(--k);background:color-mix(in srgb,var(--k) 13%,transparent);cursor:default;white-space:nowrap}
 .ic svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .ic.lt{border-color:var(--k)}
 .ic.lt b{font:800 .72rem var(--mono);letter-spacing:.02em}
 .ic .who{max-width:12ch;overflow:hidden;text-overflow:ellipsis}
 .tag{font-size:.66rem;font-weight:700;letter-spacing:.06em;line-height:16px;border:1px solid currentColor;color:var(--muted);border-radius:4px;padding:0 5px;flex:0 0 auto}
-.pr.draft{border-left-style:dashed}
 .k-ok{--k:var(--green)}.k-bad{--k:var(--red)}.k-warn{--k:var(--amber)}.k-info{--k:var(--muted)}
-.next{font-size:.84rem;line-height:22px;color:var(--muted);text-overflow:ellipsis}
+.next{font-size:.84rem;color:var(--muted);text-overflow:ellipsis}
 .next b{color:var(--fg);font-weight:600}
-.lane.m{display:none}
-.lanes.open .lane.m{display:flex}
-.fold{font:600 .82rem var(--body);color:var(--purple);background:none;border:0;padding:0 0 0 34px;cursor:pointer;justify-self:start}
+.pr.merged{height:34px}
 .pr.merged .ttl{color:var(--muted);font-weight:500}
-@container (max-width:600px){#app{padding:14px}.conn{flex-basis:20px}.pr{min-width:210px}.pb-q{flex:1 1 100%}}
+.pr.merged .ml{font-size:.78rem;font-weight:600;color:var(--purple)}
+.fold{font:600 .82rem var(--body);color:var(--purple);background:none;border:0;padding:2px 0;cursor:pointer;justify-self:start}
+@container (max-width:700px){
+  #app{padding:14px}.pb-q{flex:1 1 100%}
+  .pr,.pr.merged{display:flex;flex-wrap:wrap;align-items:center;height:auto;column-gap:8px;row-gap:0;padding:6px 10px}
+  .pr::after{content:"";flex:0 0 100%;order:1}
+  .hd,.rp{flex:0 0 auto;max-width:45%}
+  .ttl{flex:1 1 0}
+  .sig,.next{order:2;margin-top:4px}
+  .sig{flex:0 1 auto;max-width:calc(65% - 8px)}
+  .next{flex:1 1 0;text-align:right}
+  .band .dots{gap:6px}
+  .band small{display:none}
+}
 </style>
 </head>
 <body>
@@ -142,6 +169,7 @@ html,body{margin:0;background:var(--bg)}
   <div class="pb-top">
     <h1>PR Board</h1>
     <span class="when" id="pb-when">loading…</span>
+    <div class="pb-ctr" id="pb-ctr" role="group" aria-label="Filter by colour" hidden></div>
     <span class="sp"></span>
     <button class="pb-icon" id="pb-legend-btn" type="button" aria-label="Legend" aria-haspopup="dialog" aria-expanded="false" aria-controls="pb-legend" title="Legend"><svg aria-hidden="true"><use href="#i-info"/></svg></button>
     <button class="pb-btn" id="pb-refresh" type="button">Refresh</button>
@@ -154,25 +182,31 @@ html,body{margin:0;background:var(--bg)}
     <details class="pb-dd" data-f="repo"><summary>Repo <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="Repo"></div></details>
     <details class="pb-dd" data-f="state"><summary>State <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="State"></div></details>
     <details class="pb-dd" data-f="cat"><summary>Category <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="Category"></div></details>
+    <span class="pb-gb" id="pb-gb" role="group" aria-label="Group rows"><button type="button" data-g="cat" aria-pressed="true">By category</button><button type="button" data-g="repo" aria-pressed="false">By repo</button></span>
     <label class="pb-tog"><input type="checkbox" id="pb-merged"> Show merged</label>
     <span class="sp"></span>
     <button class="pb-clear" id="pb-clear" type="button" hidden>Clear</button>
     <span class="pb-count" id="pb-count" aria-live="polite"></span>
   </div>
-  <div class="repos" id="pb-repos"></div>
+  <div class="groups" id="pb-groups"></div>
 </div>
 
 <div class="pb-shade" id="pb-shade" hidden></div>
 <aside class="pb-drawer" id="pb-legend" role="dialog" aria-modal="true" aria-labelledby="pb-legend-h" tabindex="-1" hidden>
   <div class="dh"><h2 id="pb-legend-h">Legend</h2><button class="pb-icon" id="pb-legend-close" type="button" aria-label="Close legend"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
-  <h3>Colours</h3>
+  <h3>Colours: the left bar</h3>
   <ul id="pb-colours"></ul>
-  <h3>Signals, in card order</h3>
-  <ul id="pb-icons"></ul>
-  <h3>Links</h3>
+  <h3>Rows</h3>
   <ul>
-    <li><span class="ln"></span><span>Stacked on, or required first</span><small>The card on the left is the PR whose branch is this one's base, or a PR its description names in <code>[required:#N]</code>.</small></li>
-    <li><span class="ref">#N</span><span>Branches off #N</span><small>A second PR that follows the same card starts its own lane.</small></li>
+    <li><span class="tag">#N</span><span>One row per open PR</span><small>Number, repository and the branch it merges into, title, signals and Next. The left bar is the colour; hover a row for its state.</small></li>
+    <li><span class="cat">Checkout</span><span>Grouped by category</span><small>The first <code>[tag]</code> in the title; PRs without one are in Untagged, last. By repo groups them per repository instead, with the category as a pill.</small></li>
+  </ul>
+  <h3>Signals, in row order</h3>
+  <ul id="pb-icons"></ul>
+  <h3>Chains</h3>
+  <ul>
+    <li><span class="elb"></span><span>Waits on the row above</span><small>The PR whose branch is this one's base, or an open PR its description names in <code>[required:#N]</code>, in any repository.</small></li>
+    <li><span class="after">after repo#N</span><span>The PR it waits on</span><small>Shown on every chained row; a PR whose parent sits in another group keeps it without the elbow.</small></li>
   </ul>
 </aside>
 
@@ -200,12 +234,12 @@ html,body{margin:0;background:var(--bg)}
   const $=id=>document.getElementById(id);
   const ic=(k,n,t,x)=>{const d=K[k];if(!d)return"";return `<span class="ic ${d[1]}${d[3]?" lt":""}" data-k="${k}" data-name="${esc(d[2])}" title="${esc(t||d[2])}">${d[3]?`<b>${d[3]}</b>`:""}<svg aria-hidden="true"><use href="#i-${d[0]}"/></svg>${n?esc(n):""}${x?`<span class="${k==="rev"?"who":"tx"}">${esc(x)}</span>`:""}</span>`};
 
-  $("pb-colours").innerHTML=STATES.map(s=>`<li><span class="sw" style="background:var(--${s[1]})"></span><span>${esc(s[2])}</span><small>${esc(s[3])}</small></li>`).join("")+
-    `<li><span class="sw" style="background:var(--purple)"></span><span>Merged</span><small>Folded under the trunk until Clean up removes it.</small></li>`;
+  $("pb-colours").innerHTML=STATES.map(s=>`<li><span class="bar" style="background:var(--${s[1]})"></span><span>${esc(s[2])}</span><small>${esc(s[3])}</small></li>`).join("")+
+    `<li><span class="bar" style="background:var(--purple)"></span><span>Merged</span><small>Folded at the end of its group until Clean up removes it; Show merged lists them.</small></li>`;
   $("pb-icons").innerHTML=Object.entries(K).map(([k,v])=>`<li>${ic(k,v[4]&&v[4].n,"",v[4]&&v[4].x)}<span>${esc(v[2])}</span></li>`).join("")+
     `<li><span class="ic k-info more" data-name="More">+2</span><span>Signals that do not fit</span><small>The tooltip lists them.</small></li>`+
-    `<li><span class="tag">DRAFT</span><span>Draft</span><small>Next to the number; the card's left border is dashed.</small></li>`+
-    `<li><span class="dash"></span><span>Dashed left border</span><small>The PR is a draft.</small></li>`;
+    `<li><span class="tag">DRAFT</span><span>Draft</span><small>Next to the number; the row's left bar is dashed.</small></li>`+
+    `<li><span class="dash"></span><span>Dashed left bar</span><small>The PR is a draft.</small></li>`;
 
   // ---- legend drawer
   const drawer=$("pb-legend"),shade=$("pb-shade"),legendBtn=$("pb-legend-btn");
@@ -227,65 +261,66 @@ html,body{margin:0;background:var(--bg)}
     }
   });
 
-  // ---- cards
-  // every open card has the same four rows (header, title, signals, next) and
-  // merged cards the first two, so cards of a kind always share one height
-  const card=(c,repo)=>{
-    const open=c.state!=="merged";
+  // ---- rows
+  // a repo goes by its name, or owner/name when two owners share a name
+  let names={};
+  const short=r=>{const n=String(r).split("/").pop();return names[n]>1?r:n};
+  // inside a category group the title drops its own [Category] tag
+  const shownTitle=(c,by)=>{
+    if(by!=="cat"||!c.category)return c.title;
+    const t=c.title.replace("["+c.category+"]","").replace(/\s{2,}/g," ").trim();
+    return t||c.title;
+  };
+  // every open row has the same five columns (number, repo and branch,
+  // title, signals, next) and one height; merged rows are shorter
+  const row=(c,by,depth,chain,gid)=>{
+    const open=c.state!=="merged",s=short(c.repo);
     const text=`#${c.n} ${c.title} ${c.head||""}`.toLowerCase();
-    return `<article class="pr ${esc(c.state)}${c.draft?" draft":""}" data-n="${esc(c.n)}" data-repo="${esc(repo)}" data-state="${esc(c.state)}" data-cat="${esc(c.category||NONE)}" data-text="${esc(text)}"><div class="hd"><a class="num" href="${esc(safeURL(c.url))}" target="_blank" rel="noopener">#${esc(c.n)}</a>${c.draft?`<span class="tag" title="Draft">DRAFT</span>`:""}<span class="st" title="${esc(c.label)}">${esc(c.label)}</span>${c.base?`<span class="base" title="Base branch ${esc(c.base)}">on ${esc(c.base)}</span>`:""}${c.category?`<span class="cat" title="Category: ${esc(c.category)}">${esc(c.category)}</span>`:""}</div>
-    <div class="ttl" title="${esc(c.title)}">${esc(c.title)}</div>${open?`<div class="sig">${(c.signals||[]).map(s=>ic(s.k,s.n,s.title,s.text)).join("")}</div>
-    <div class="next" title="${esc(c.next||"")}">${c.next?`<b>Next:</b> ${esc(c.next)}`:""}</div>`:""}</article>`;
+    const rp=by==="repo"?`<span class="rp" title="${esc(c.repo)} → ${esc(c.base)}"><em>→ ${esc(c.base)}</em></span>`
+      :`<span class="rp" title="${esc(c.repo)} → ${esc(c.base)}">${esc(s)}<em> → ${esc(c.base)}</em></span>`;
+    const attrs=`data-key="${esc(c.key)}" data-parent="${esc(c.parent||"")}" data-depth="${depth||0}" data-chain="${esc(chain)}" data-group="${esc(gid)}" data-n="${esc(c.n)}" data-repo="${esc(s)}" data-state="${esc(c.state)}" data-cat="${esc(c.category||NONE)}" data-text="${esc(text)}"`;
+    const head=`<div class="hd"><a class="num" href="${esc(safeURL(c.url))}" target="_blank" rel="noopener">#${esc(c.n)}</a>${c.draft?`<span class="tag" title="Draft">DRAFT</span>`:""}</div>${rp}<div class="ttl" title="${esc(c.title)}">${esc(shownTitle(c,by))}</div>`;
+    if(!open)return `<article class="pr merged" ${attrs} title="${esc(c.label)}">${head}<div class="sig"><span class="ml">${esc(c.label)}</span></div><div class="next"></div></article>`;
+    const after=c.after?`<span class="after" title="${c.link==="stack"?"Stacked on":"Required first"}: ${esc(c.parent)}">${esc(c.after)}</span>`:"";
+    const cat=by==="repo"&&c.category?`<span class="cat" title="Category: ${esc(c.category)}">${esc(c.category)}</span>`:"";
+    return `<article class="pr ${esc(c.state)}${c.draft?" draft":""}${depth?" sub":""}" ${attrs} title="${esc(c.label)}">${head}<div class="sig">${after}${(c.signals||[]).map(s=>ic(s.k,s.n,s.title,s.text)).join("")}${cat}</div><div class="next" title="${esc(c.next||"")}">${c.next?`<b>Next:</b> ${esc(c.next)}`:""}</div></article>`;
   };
   // a signals row never wraps: icons that do not fit fold into a "+N" chip
   function fitSignals(root){
-    root.querySelectorAll(".sig").forEach(row=>{
-      row.querySelectorAll(".more").forEach(m=>m.remove());
-      const icons=[...row.children];
+    root.querySelectorAll(".pr:not(.merged) .sig").forEach(sig=>{
+      sig.querySelectorAll(".more").forEach(m=>m.remove());
+      const icons=[...sig.querySelectorAll(".ic")];
       icons.forEach(i=>i.hidden=false);
-      if(!row.clientWidth||row.scrollWidth<=row.clientWidth)return;
+      if(!sig.clientWidth||sig.scrollWidth<=sig.clientWidth)return;
       const more=document.createElement("span");
       more.className="ic k-info more";
-      row.appendChild(more);
+      sig.insertBefore(more,sig.querySelector(".cat"));
       const hidden=[];
       for(let i=icons.length-1;i>=0;i--){
         icons[i].hidden=true;hidden.unshift(icons[i]);
         more.textContent="+"+hidden.length;
         more.title=hidden.map(h=>h.title===h.dataset.name?h.title:`${h.dataset.name}: ${h.title}`).join("\n");
-        if(row.scrollWidth<=row.clientWidth)break;
+        if(sig.scrollWidth<=sig.clientWidth)break;
       }
     });
   }
-  const item=(it,repo)=>it.card?card(it.card,repo):it.ref?`<span class="ref" title="Follows ${esc(it.ref)}">${esc(it.ref)}</span>`:`<div class="conn" title="${it.link==="required"?"Required first":"Stacked on"}"></div>`;
-  const lane=(items,repo,cls,group)=>`<div class="lane ${cls||""}"${group!=null?` data-group="${group}"`:""}>${items[0]&&items[0].ref?"":`<div class="conn"></div>`}${items.map(it=>item(it,repo)).join("")}</div>`;
 
-  // lanes that hang off a card in another lane ("#N" reference) form one
-  // chain with it; a chain is shown whole when any of its PRs matches
-  function groups(lanes){
-    const parent=lanes.map((_,i)=>i);
-    const find=i=>parent[i]===i?i:(parent[i]=find(parent[i]));
-    const where={};
-    lanes.forEach((l,i)=>l.forEach(it=>{if(it.card)where[it.card.n]=i}));
-    lanes.forEach((l,i)=>l.forEach(it=>{
-      const m=it.ref&&/^#(\d+)$/.exec(it.ref);
-      if(m&&where[m[1]]!=null)parent[find(i)]=find(where[m[1]]);
-    }));
-    return lanes.map((_,i)=>find(i));
-  }
-
-  // ---- filters, kept in location.hash: #q=..&repo=a,b&state=..&cat=..&merged=1
-  const f={q:"",repo:new Set(),state:new Set(),cat:new Set(),merged:false};
-  const LISTS=["repo","state","cat"];
+  // ---- filters and view, kept in location.hash:
+  // #q=..&repo=a,b&state=..&cat=..&merged=1&group=repo&fold=Checkout,~none&rfold=web
+  const f={q:"",repo:new Set(),state:new Set(),cat:new Set(),merged:false,group:"cat",fold:new Set(),rfold:new Set()};
+  const LISTS=["repo","state","cat"],FOLDS=["fold","rfold"];
+  const foldSet=()=>f.group==="repo"?f.rfold:f.fold;
   function readHash(){
     const h=location.hash.replace(/^#/,"");
-    f.q="";f.merged=false;LISTS.forEach(k=>f[k]=new Set());
+    f.q="";f.merged=false;f.group="cat";LISTS.concat(FOLDS).forEach(k=>f[k]=new Set());
     for(const part of h.split("&")){
       if(!part)continue;
       const i=part.indexOf("="),k=i<0?part:part.slice(0,i),v=i<0?"":part.slice(i+1);
       const dec=s=>{try{return decodeURIComponent(s.replace(/\+/g," "))}catch(e){return s}};
       if(k==="q")f.q=dec(v);
       else if(k==="merged")f.merged=v==="1";
-      else if(LISTS.includes(k))v.split(",").filter(Boolean).forEach(x=>f[k].add(dec(x)));
+      else if(k==="group")f.group=v==="repo"?"repo":"cat";
+      else if(LISTS.includes(k)||FOLDS.includes(k))v.split(",").filter(Boolean).forEach(x=>f[k].add(dec(x)));
     }
   }
   function hashString(){
@@ -293,6 +328,8 @@ html,body{margin:0;background:var(--bg)}
     if(f.q)parts.push("q="+encodeURIComponent(f.q));
     LISTS.forEach(k=>{if(f[k].size)parts.push(k+"="+[...f[k]].map(encodeURIComponent).join(","))});
     if(f.merged)parts.push("merged=1");
+    if(f.group==="repo")parts.push("group=repo");
+    FOLDS.forEach(k=>{if(f[k].size)parts.push(k+"="+[...f[k]].map(encodeURIComponent).join(","))});
     return parts.join("&");
   }
   function writeHash(){
@@ -309,6 +346,8 @@ html,body{margin:0;background:var(--bg)}
       dd.querySelectorAll("input").forEach(i=>i.checked=f[k].has(i.value));
       const n=dd.querySelector(".n");n.hidden=!f[k].size;n.textContent=f[k].size;
     });
+    document.querySelectorAll("#pb-ctr button").forEach(b=>b.setAttribute("aria-pressed",String(f.state.has(b.dataset.k))));
+    document.querySelectorAll("#pb-gb button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.g===f.group)));
     $("pb-clear").hidden=!active();
   }
   let menuKey="";
@@ -327,42 +366,31 @@ html,body{margin:0;background:var(--bg)}
     (!useState||!f.state.size||f.state.has(el.dataset.state))&&
     (!f.cat.size||f.cat.has(el.dataset.cat));
 
+  // a chain (a row and the rows under it) is shown whole when any of its
+  // PRs matches, the others dimmed, so the merge order stays visible
   function apply(){
-    let shown=0,total=0,anyRepo=false;
-    document.querySelectorAll("#pb-repos section.repo").forEach(sec=>{
-      const byGroup={};
-      sec.querySelectorAll(".lane:not(.m)").forEach(l=>{
-        const g=l.dataset.group;
-        l.querySelectorAll(".pr").forEach(c=>{
-          const m=matches(c,true);
-          c._m=m;total++;if(m)shown++;
-          if(m)byGroup[g]=true;
-        });
-      });
+    let shown=0,total=0,anyGroup=false;
+    document.querySelectorAll("#pb-groups section.group").forEach(sec=>{
+      const rows=[...sec.querySelectorAll(".pr:not(.merged)")],hit={};
+      rows.forEach(r=>{const m=matches(r,true);r._m=m;total++;if(m){shown++;hit[r.dataset.chain]=true}});
       let visible=0;
-      sec.querySelectorAll(".lane:not(.m)").forEach(l=>{
-        const on=!!byGroup[l.dataset.group];
-        l.hidden=!on;if(on)visible++;
-        l.querySelectorAll(".pr").forEach(c=>c.classList.toggle("dim",on&&!c._m));
-      });
+      rows.forEach(r=>{const on=!!hit[r.dataset.chain];r.hidden=!on;if(on)visible++;r.classList.toggle("dim",on&&!r._m)});
       // merged PRs ignore the State filter: Show merged is their switch
+      const open=sec.querySelector(".rows").classList.contains("mopen");
       let mergedShown=0;
-      sec.querySelectorAll(".lane.m").forEach(l=>{
-        const on=f.merged&&matches(l.querySelector(".pr"),false);
-        l.hidden=!on;if(on)mergedShown++;
-      });
+      sec.querySelectorAll(".pr.merged").forEach(r=>{const on=f.merged&&matches(r,false);if(on)mergedShown++;r.hidden=!(on&&open)});
       const fold=sec.querySelector(".fold");
-      if(fold){
-        fold.hidden=!mergedShown;
-        fold.textContent=`${mergedShown} merged ${sec.querySelector(".lanes").classList.contains("open")?"▾":"▸"}`;
-      }
+      if(fold){fold.hidden=!mergedShown;fold.textContent=`${mergedShown} merged ${open?"▾":"▸"}`;fold.setAttribute("aria-expanded",String(open))}
+      const closed=foldSet().has(sec.dataset.gid);
+      sec.querySelector(".band").setAttribute("aria-expanded",String(!closed));
+      sec.querySelector(".rows").hidden=closed;
       sec.hidden=!visible&&!mergedShown;
-      if(!sec.hidden)anyRepo=true;
+      if(!sec.hidden)anyGroup=true;
     });
     $("pb-count").textContent=`Showing ${shown} of ${total} open`;
-    $("pb-nomatch")&&($("pb-nomatch").hidden=anyRepo||!total&&!f.merged);
+    $("pb-nomatch")&&($("pb-nomatch").hidden=anyGroup||!total&&!f.merged);
     syncControls();
-    fitSignals($("pb-repos"));
+    fitSignals($("pb-groups"));
   }
   function changed(){writeHash();apply()}
 
@@ -379,16 +407,40 @@ html,body{margin:0;background:var(--bg)}
   document.addEventListener("click",e=>document.querySelectorAll(".pb-dd[open]").forEach(o=>{if(!o.contains(e.target))o.open=false}));
   document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".pb-dd[open]").forEach(o=>{o.open=false;o.querySelector("summary").focus()})});
   $("pb-clear").addEventListener("click",()=>{f.q="";f.merged=false;LISTS.forEach(k=>f[k].clear());changed();$("pb-q").focus()});
-  window.addEventListener("hashchange",()=>{readHash();apply()});
+  $("pb-ctr").addEventListener("click",e=>{
+    const b=e.target.closest("button[data-k]");if(!b)return;
+    const k=b.dataset.k;f.state.has(k)?f.state.delete(k):f.state.add(k);
+    changed();
+  });
+  document.querySelectorAll("#pb-gb button").forEach(b=>b.addEventListener("click",()=>{
+    if(f.group===b.dataset.g)return;
+    f.group=b.dataset.g;writeHash();if(view)render(view);
+  }));
+  window.addEventListener("hashchange",()=>{const g=f.group;readHash();if(view&&g!==f.group)render(view);else apply()});
 
   // ---- render
-  const openRepos=new Set();
+  const openMerged=new Set();
   let view=null;
   function setupHTML(path){
     return `<div class="pb-setup"><h2>Set up PR Board</h2>
       <p>List the GitHub users or organizations whose pull requests you author in <code>${esc(path)}</code>:</p>
       <pre>"owners": ["your-org", "your-username"]</pre>
       <p>The next refresh picks it up; press Refresh when you have saved the file.</p></div>`;
+  }
+  const counts=rows=>{const c={ready:0,approve:0,missing:0};rows.forEach(r=>{if(r.state in c)c[r.state]++});return c};
+  const dots=c=>STATES.map(s=>`<span title="${esc(s[2])}"><i style="background:var(--${s[1]})"></i>${c[s[0]]}</span>`).join("");
+  function groupHTML(g,by){
+    const gid=by==="repo"?short(g.key):(g.key||NONE);
+    const rows=g.rows||[],merged=g.merged||[];
+    const title=by==="repo"
+      ?`<span class="rn">${esc(g.key)}</span><small>→ ${esc(g.branch||"?")}</small>`
+      :`<span class="name">${esc(g.key||"Untagged")}</span><small>${esc((g.repos||[]).map(short).join(" · "))}</small>`;
+    const mg=by==="repo"?`<span class="mg" title="Merged in the last days, until Clean up">${merged.length} merged</span>`:"";
+    let chain="";
+    const body=rows.map(r=>{if(!r.depth)chain=r.key;return row(r,by,r.depth,chain,gid)}).join("")+
+      merged.map(m=>row(m,by,0,m.key,gid)).join("")+(merged.length?`<button class="fold" type="button"></button>`:"");
+    return `<section class="group" data-gid="${esc(gid)}"><button class="band" type="button" aria-expanded="true"><span class="car" aria-hidden="true">▾</span>${title}<span class="dots">${dots(counts(rows))}${mg}</span></button>
+      <div class="rows${openMerged.has(by+":"+gid)?" mopen":""}">${body}</div></section>`;
   }
   function render(v){
     view=v;
@@ -397,29 +449,27 @@ html,body{margin:0;background:var(--bg)}
     const btn=$("pb-cleanup");
     btn.disabled=!v.merged; btn.textContent=v.merged?`Clean up ${v.merged} merged`:"Nothing to clean up";
     const err=$("pb-err"); err.hidden=!(v.errors&&v.errors.length); err.textContent=(v.errors||[]).join(" · ");
-    const repos=v.repos||[];
+    const repos=v.repos||[],by=f.group,groups=(by==="repo"?repos:v.categories)||[];
     $("pb-bar").hidden=!!v.setup||!repos.length;
-    if(v.setup){$("pb-repos").innerHTML=setupHTML(v.setup);return}
-    // a repo goes by its name, or owner/name when two owners share a name
-    const names={};
-    repos.forEach(r=>{const n=r.repo.split("/").pop();names[n]=(names[n]||0)+1});
-    const short=r=>{const n=r.split("/").pop();return names[n]>1?r:n};
-    const cats=new Set();
-    repos.forEach(r=>{(r.lanes||[]).forEach(l=>l.forEach(it=>{if(it.card&&it.card.category)cats.add(it.card.category)}));(r.merged||[]).forEach(m=>{if(m.category)cats.add(m.category)})});
-    buildMenus({repos:repos.map(r=>short(r.repo)).sort(),cats:[...cats].sort((a,b)=>a.localeCompare(b))});
-    $("pb-repos").innerHTML=repos.length?repos.map(r=>{
-      const s=short(r.repo),g=groups(r.lanes||[]);
-      return `<section class="repo" data-repo="${esc(r.repo)}"><div class="branch"><small>${esc(r.repo)}</small><b>${esc(r.branch||"?")}</b></div>
-      <div class="lanes${openRepos.has(r.repo)?" open":""}">${(r.lanes||[]).map((l,i)=>lane(l,s,"",g[i])).join("")}${(r.merged||[]).map(m=>lane([{card:m}],s,"m")).join("")}${r.merged&&r.merged.length?`<button class="fold" type="button"></button>`:""}</div></section>`;
-    }).join("")+`<p class="empty" id="pb-nomatch" hidden>No PR matches these filters. <button class="pb-clear" type="button" data-clear>Clear</button></p>`
+    $("pb-ctr").hidden=!!v.setup||!repos.length;
+    if(v.setup){$("pb-groups").innerHTML=setupHTML(v.setup);return}
+    names={};
+    repos.forEach(r=>{const n=r.key.split("/").pop();names[n]=(names[n]||0)+1});
+    const all=repos.flatMap(r=>r.rows||[]),cats=new Set();
+    repos.forEach(r=>(r.rows||[]).concat(r.merged||[]).forEach(c=>{if(c.category)cats.add(c.category)}));
+    buildMenus({repos:repos.map(r=>short(r.key)).sort(),cats:[...cats].sort((a,b)=>a.localeCompare(b))});
+    const c=counts(all);
+    $("pb-ctr").innerHTML=STATES.map(s=>`<button type="button" data-k="${s[0]}" aria-pressed="false" title="Show only: ${esc(s[2])}"><i style="background:var(--${s[1]})"></i><b>${c[s[0]]}</b> ${esc(s[2].toLowerCase())}</button>`).join("");
+    $("pb-groups").innerHTML=groups.length?groups.map(g=>groupHTML(g,by)).join("")+`<p class="empty" id="pb-nomatch" hidden>No PR matches these filters. <button class="pb-clear" type="button" data-clear>Clear</button></p>`
       :`<p class="empty">No PRs yet. Refresh runs on start and every 5 minutes.</p>`;
-    document.querySelectorAll("#pb-repos .fold").forEach(b=>b.addEventListener("click",()=>{
-      const l=b.parentElement,repo=l.parentElement.dataset.repo,open=l.classList.toggle("open");
-      open?openRepos.add(repo):openRepos.delete(repo);
-      apply();
-    }));
-    const c=document.querySelector("#pb-repos [data-clear]");
-    if(c)c.addEventListener("click",()=>$("pb-clear").click());
+    document.querySelectorAll("#pb-groups section.group").forEach(sec=>{
+      const gid=sec.dataset.gid;
+      sec.querySelector(".band").addEventListener("click",()=>{const s=foldSet();s.has(gid)?s.delete(gid):s.add(gid);changed()});
+      const b=sec.querySelector(".fold");
+      if(b)b.addEventListener("click",()=>{const open=sec.querySelector(".rows").classList.toggle("mopen");open?openMerged.add(by+":"+gid):openMerged.delete(by+":"+gid);apply()});
+    });
+    const cl=document.querySelector("#pb-groups [data-clear]");
+    if(cl)cl.addEventListener("click",()=>$("pb-clear").click());
     apply();
   }
 
@@ -470,8 +520,8 @@ html,body{margin:0;background:var(--bg)}
   });
 
   let fitTimer=0;
-  window.addEventListener("resize",()=>{clearTimeout(fitTimer);fitTimer=setTimeout(()=>fitSignals($("pb-repos")),100)});
-  if(document.fonts)document.fonts.ready.then(()=>fitSignals($("pb-repos")));
+  window.addEventListener("resize",()=>{clearTimeout(fitTimer);fitTimer=setTimeout(()=>fitSignals($("pb-groups")),100)});
+  if(document.fonts)document.fonts.ready.then(()=>fitSignals($("pb-groups")));
   readHash();
   load();beat();
   setInterval(()=>{beat();load()},60000);

@@ -33,49 +33,51 @@ func TestDemoStore(t *testing.T) {
 	}
 
 	v := BuildView(s, now)
-	byRepo := map[string]RepoView{}
-	for _, r := range v.Repos {
-		byRepo[r.Repo] = r
+	byRepo := map[string]Group{}
+	for _, g := range v.Repos {
+		byRepo[g.Key] = g
 	}
-	if got := laneString(byRepo["acme/web"].Lanes); !strings.Contains(got, "#412 + #415") {
-		t.Errorf("web lanes %q: want the [required:] chain", got)
+	if got := rowString(byRepo["acme/web"]); !strings.Contains(got, "web#412 .web#415") {
+		t.Errorf("web rows %q: want the [required:] chain", got)
 	}
-	if got := laneString(byRepo["acme/design-system"].Lanes); !strings.Contains(got, "#88 = #90") {
-		t.Errorf("design-system lanes %q: want the stack", got)
+	if got := rowString(byRepo["acme/design-system"]); !strings.Contains(got, "design-system#88 .design-system#90") {
+		t.Errorf("design-system rows %q: want the stack", got)
 	}
 	if b := byRepo["acme/infra"].Branch; b != "production" {
 		t.Errorf("infra branch %q", b)
 	}
-	var chips []string
-	for _, l := range byRepo["acme/api"].Lanes {
-		for _, it := range l {
-			if it.Card != nil && it.Card.N == 236 {
-				for _, sg := range it.Card.Signals {
-					chips = append(chips, sg.Text)
+	var keys []string
+	for _, g := range v.Categories {
+		keys = append(keys, g.Key)
+	}
+	if got := strings.Join(keys, ","); got != "Billing,Checkout,Design system,Search," {
+		t.Errorf("category order %q: want alphabetical, Untagged last", got)
+	}
+	// the cross-repo requirement: api#236 sits under design-system#88 in its category
+	for _, g := range v.Categories {
+		if g.Key == "Design system" {
+			if got := rowString(g); !strings.Contains(got, "design-system#88 .api#236 .design-system#90") {
+				t.Errorf("design system rows %q: want api#236 under design-system#88", got)
+			}
+			for _, r := range g.Rows {
+				if r.N == 236 && (r.After != "after design-system#88" || slices.ContainsFunc(r.Signals, func(s Signal) bool { return s.K == "req_open" })) {
+					t.Errorf("api#236 after %q signals %+v", r.After, r.Signals)
 				}
 			}
 		}
 	}
-	if !slices.Contains(chips, "after design-system#88") {
-		t.Errorf("api#236 chips %q: want the cross-repo requirement", chips)
-	}
 	// every signal kind shows up on some open card, and every card keeps the fixed order
 	kinds := map[string]bool{}
 	drafts := 0
-	for _, r := range v.Repos {
-		for _, l := range r.Lanes {
-			for _, it := range l {
-				if it.Card == nil {
-					continue
-				}
-				if it.Card.Draft {
-					drafts++
-				}
-				for i, sg := range it.Card.Signals {
-					kinds[sg.K] = true
-					if i > 0 && signalSlot(it.Card.Signals[i-1].K) > signalSlot(sg.K) {
-						t.Errorf("%s: %s before %s", it.Card.Key, it.Card.Signals[i-1].K, sg.K)
-					}
+	for _, g := range v.Repos {
+		for _, r := range g.Rows {
+			if r.Draft {
+				drafts++
+			}
+			for i, sg := range r.Signals {
+				kinds[sg.K] = true
+				if i > 0 && signalSlot(r.Signals[i-1].K) > signalSlot(sg.K) {
+					t.Errorf("%s: %s before %s", r.Key, r.Signals[i-1].K, sg.K)
 				}
 			}
 		}

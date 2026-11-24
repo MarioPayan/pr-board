@@ -42,11 +42,11 @@ func TestDerive(t *testing.T) {
 		{"ready", func(p *PR) {}, StReady, "Ready to merge", "ci_pass approved", "merge"},
 		{"merged", func(p *PR) { p.State = "MERGED"; p.MergedAt = time.Date(2026, 11, 20, 18, 0, 0, 0, time.Local) }, StMerged, "Merged 11-20", "", ""},
 		// red: something is missing, and Next names it
-		{"draft, approved and green", func(p *PR) { p.Draft = true }, StMissing, "Something missing", "draft ci_pass approved", "mark ready when you want review"},
-		{"draft with conflicts", func(p *PR) { p.Draft = true; p.Mergeable = "CONFLICTING" }, StMissing, "Something missing", "draft ci_pass approved conflict", "merge main"},
+		{"draft, approved and green", func(p *PR) { p.Draft = true }, StMissing, "Something missing", "ci_pass approved", "mark ready when you want review"},
+		{"draft with conflicts", func(p *PR) { p.Draft = true; p.Mergeable = "CONFLICTING" }, StMissing, "Something missing", "ci_pass approved conflict", "merge main"},
 		{"draft with no reviewer shows no norev", func(p *PR) {
 			p.Draft, p.ReviewDecision, p.Reviews = true, "REVIEW_REQUIRED", nil
-		}, StMissing, "Something missing", "draft ci_pass", "mark ready when you want review"},
+		}, StMissing, "Something missing", "ci_pass", "mark ready when you want review"},
 		{"changes requested", func(p *PR) {
 			p.ReviewDecision = "CHANGES_REQUESTED"
 			p.Reviews = []Review{{Author: "alice", State: "CHANGES_REQUESTED"}, {Author: "bob", State: "DISMISSED"}}
@@ -85,7 +85,7 @@ func TestDerive(t *testing.T) {
 		}, StMissing, "Something missing", "ci_pass rev behind", "update from main"},
 		{"draft, otherwise ready to approve", func(p *PR) {
 			p.Draft, p.ReviewDecision, p.Reviews = true, "REVIEW_REQUIRED", nil
-		}, StMissing, "Something missing", "draft ci_pass", "mark ready when you want review"},
+		}, StMissing, "Something missing", "ci_pass", "mark ready when you want review"},
 		// green edge cases
 		{"no review policy, approving review", func(p *PR) { p.ReviewDecision = "" }, StReady, "Ready to merge", "ci_pass approved", "merge"},
 		{"no checks at all", func(p *PR) { p.ChecksTotal = 0 }, StReady, "Ready to merge", "approved", "merge"},
@@ -105,6 +105,75 @@ func TestDerive(t *testing.T) {
 					d.State, d.Label, sigKeys(d), d.Next, c.state, c.label, c.signals, c.next)
 			}
 		})
+	}
+}
+
+func TestDraftIsATagNotASignal(t *testing.T) {
+	p := base()
+	p.Draft = true
+	if d := Derive(p, now); !d.Draft || strings.Contains(sigKeys(d), "draft") {
+		t.Errorf("draft: Draft=%v signals=%q", d.Draft, sigKeys(d))
+	}
+	if d := Derive(base(), now); d.Draft {
+		t.Error("a ready PR is not a draft")
+	}
+}
+
+// Every card lists its signals in one fixed order, whatever produced them.
+func TestSignalOrder(t *testing.T) {
+	everything := func(p *PR) {
+		p.ChecksFailing, p.ChecksPending = []string{"unit"}, 2
+		p.ReviewDecision = "CHANGES_REQUESTED"
+		p.Reviews = []Review{{Author: "alice", State: "CHANGES_REQUESTED"}, {Author: "bob", State: "DISMISSED"}}
+		p.Requests = []string{"carol"}
+		p.Mergeable, p.MergeState = "CONFLICTING", "BEHIND"
+		p.Threads = []Thread{{}}
+		p.UpdatedAt = now.AddDate(0, 0, -9)
+		p.Requires = []Requirement{{Repo: "acme/app", N: 2, State: "MERGED"}, {Repo: "acme/app", N: 3, State: "OPEN"}}
+	}
+	cases := []struct {
+		name string
+		mod  func(*PR)
+		want string
+	}{
+		{"everything at once", everything,
+			"ci_fail(1) ci_pend(2) changes dismissed rev conflict behind req_open req_done threads(1) stale(9)"},
+		{"approved, rule, requirement and no reviewer slot", func(p *PR) {
+			p.MergeState = "BLOCKED"
+			p.Threads = []Thread{{}, {}}
+			p.Requires = []Requirement{{Repo: "acme/app", N: 2, State: "CLOSED"}, {Repo: "acme/web", N: 4, State: ""}}
+		}, "ci_pass approved blocked req_closed req_unknown threads(2)"},
+		{"no reviewer before conflicts", func(p *PR) {
+			p.ReviewDecision, p.Reviews, p.Mergeable = "REVIEW_REQUIRED", []Review{{Author: "bob", State: "DISMISSED"}}, "CONFLICTING"
+		}, "ci_pass dismissed norev conflict"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := base()
+			c.mod(&p)
+			d := Derive(p, now)
+			if got := sigKeys(d); got != c.want {
+				t.Errorf("got  %q\nwant %q", got, c.want)
+			}
+			for i := 1; i < len(d.Signals); i++ {
+				if signalSlot(d.Signals[i-1].K) > signalSlot(d.Signals[i].K) {
+					t.Errorf("%s before %s", d.Signals[i-1].K, d.Signals[i].K)
+				}
+			}
+		})
+	}
+	// every kind Derive can emit has a slot
+	seen := map[string]bool{}
+	for _, kinds := range SignalOrder {
+		for _, k := range kinds {
+			if seen[k] {
+				t.Errorf("%s appears twice in SignalOrder", k)
+			}
+			seen[k] = true
+		}
+	}
+	if len(seen) != 17 {
+		t.Errorf("SignalOrder has %d kinds, want 17", len(seen))
 	}
 }
 

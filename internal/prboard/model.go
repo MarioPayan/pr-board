@@ -1,6 +1,7 @@
 package prboard
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -73,6 +74,30 @@ type Signal struct {
 	Ref   string `json:"ref,omitempty"`  // the required PR's key
 }
 
+// SignalOrder is the fixed order of the signals on every card: CI, review
+// state, reviewer, conflicts, behind, branch rule, required PRs, threads,
+// stale. Kinds that share a slot keep the order Derive adds them in.
+var SignalOrder = [][]string{
+	{"ci_fail", "ci_pend", "ci_pass"},
+	{"approved", "changes", "dismissed"},
+	{"norev", "rev"},
+	{"conflict"},
+	{"behind"},
+	{"blocked"},
+	{"req_open", "req_closed", "req_unknown", "req_done"},
+	{"threads"},
+	{"stale"},
+}
+
+func signalSlot(k string) int {
+	for i, kinds := range SignalOrder {
+		if slices.Contains(kinds, k) {
+			return i
+		}
+	}
+	return len(SignalOrder)
+}
+
 // Derived is everything the page shows about a PR that follows from its data.
 type Derived struct {
 	State    string   `json:"state"`
@@ -80,6 +105,7 @@ type Derived struct {
 	Signals  []Signal `json:"signals"`
 	Next     string   `json:"next"`
 	Category string   `json:"category"`
+	Draft    bool     `json:"draft,omitempty"` // shown as a tag and a dashed border, not a signal
 }
 
 const staleDays = 7
@@ -120,7 +146,7 @@ func plural(n int, one, many string) string {
 
 // Derive computes state, signals, next step and category tag.
 func Derive(p PR, now time.Time) Derived {
-	d := Derived{Category: Category(p.Title, p.Repo), Signals: []Signal{}}
+	d := Derived{Category: Category(p.Title, p.Repo), Signals: []Signal{}, Draft: p.Draft && p.State == "OPEN"}
 	if p.State == "MERGED" {
 		d.State, d.Label = StMerged, "Merged"
 		if !p.MergedAt.IsZero() {
@@ -131,12 +157,8 @@ func Derive(p PR, now time.Time) Derived {
 	failing, pending := len(p.ChecksFailing), p.ChecksPending
 	approved, changes, conflict := p.approved(), p.changesRequested(), p.conflict()
 
-	// signals, in the prototype's order
 	add := func(k string, n int, title string) { d.Signals = append(d.Signals, Signal{K: k, N: n, Title: title}) }
-	if p.Draft {
-		add("draft", 0, "Draft")
-	}
-	// required PRs that still hold this one come first, done ones last
+	// required PRs that still hold this one come before the merged ones
 	var reqNext string
 	addReq := func(r Requirement) {
 		k, state, ref := "req_unknown", "not found", shortRef(r.Repo, p.Repo, r.N)
@@ -166,6 +188,11 @@ func Derive(p PR, now time.Time) Derived {
 			addReq(r)
 		}
 	}
+	for _, r := range p.Requires {
+		if r.State == "MERGED" {
+			addReq(r)
+		}
+	}
 	if failing > 0 {
 		add("ci_fail", failing, fmt.Sprintf("%d CI %s failing: %s", failing, plural(failing, "job", "jobs"), strings.Join(p.ChecksFailing, ", ")))
 	}
@@ -190,13 +217,14 @@ func Derive(p PR, now time.Time) Derived {
 		add("changes", 0, t)
 	}
 	if who := reviewers(p.Reviews, "DISMISSED"); len(who) > 0 {
-		add("dismissed", 0, "Review dismissed: "+strings.Join(who, ", "))
+		add("dismissed", 0, "Approval dismissed: "+strings.Join(who, ", "))
 	}
 	if p.noReviewer() && !p.Draft {
 		add("norev", 0, "No reviewer requested")
 	}
 	if len(p.Requests) > 0 {
-		add("rev", 0, "Review requested: "+strings.Join(p.Requests, ", "))
+		who := strings.Join(p.Requests, ", ")
+		d.Signals = append(d.Signals, Signal{K: "rev", Title: "Waiting on " + who, Text: who})
 	}
 	if conflict {
 		add("conflict", 0, "Merge conflicts with "+p.Base)
@@ -213,11 +241,7 @@ func Derive(p PR, now time.Time) Derived {
 	if days := int(now.Sub(p.UpdatedAt).Hours() / 24); !p.UpdatedAt.IsZero() && days > staleDays {
 		add("stale", days, fmt.Sprintf("%d days without an update", days))
 	}
-	for _, r := range p.Requires {
-		if r.State == "MERGED" {
-			addReq(r)
-		}
-	}
+	slices.SortStableFunc(d.Signals, func(a, b Signal) int { return cmp.Compare(signalSlot(a.K), signalSlot(b.K)) })
 
 	// in place: checks passed and none pending, no conflict, not behind, no
 	// requested changes and no required PR still to merge

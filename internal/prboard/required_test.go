@@ -48,9 +48,9 @@ func TestRequiredBlocksReady(t *testing.T) {
 		name, state, label, next, signals string
 	}{
 		{"MERGED", StReady, "Ready to merge", "merge", "ci_pass approved req_done"},
-		{"OPEN", StMissing, "Something missing", "merge infra#7 first", "req_open ci_pass approved"},
-		{"CLOSED", StMissing, "Something missing", "infra#7 was closed without merging", "req_closed ci_pass approved"},
-		{"", StMissing, "Something missing", "check infra#7: not found", "req_unknown ci_pass approved"},
+		{"OPEN", StMissing, "Something missing", "merge infra#7 first", "ci_pass approved req_open"},
+		{"CLOSED", StMissing, "Something missing", "infra#7 was closed without merging", "ci_pass approved req_closed"},
+		{"", StMissing, "Something missing", "check infra#7: not found", "ci_pass approved req_unknown"},
 	}
 	for _, c := range cases {
 		t.Run("target "+c.name, func(t *testing.T) {
@@ -73,7 +73,10 @@ func TestRequiredBlocksReady(t *testing.T) {
 	p = base()
 	p.Requires = []Requirement{{Repo: "acme/app", N: 2, State: "OPEN"}, {Repo: "acme/infra", N: 7, State: "MERGED"}}
 	d := Derive(p, now)
-	first, last := d.Signals[0], d.Signals[len(d.Signals)-1]
+	if got := sigKeys(d); got != "ci_pass approved req_open req_done" {
+		t.Fatalf("signals %q", got)
+	}
+	first, last := d.Signals[2], d.Signals[3]
 	if first.Text != "after #2" || first.Ref != "acme/app#2" || first.Title != "Merge after acme/app#2 (open)" {
 		t.Errorf("open chip: %+v", first)
 	}

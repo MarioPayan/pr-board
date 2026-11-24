@@ -16,6 +16,8 @@ type Config struct {
 	MergedDays  int      `json:"merged_days"`
 	CloneRoots  []string `json:"clone_roots"`
 	IdleMinutes int      `json:"idle_minutes"`
+	// Port the server prefers, so a saved link keeps working across restarts.
+	Port int `json:"port"`
 }
 
 // DefaultConfig is written when the config file is missing. It names no
@@ -27,6 +29,7 @@ func DefaultConfig() Config {
 		MergedDays:  7,
 		CloneRoots:  []string{"~/repos", "~/src", "~/code"},
 		IdleMinutes: 10,
+		Port:        7878,
 	}
 }
 
@@ -127,6 +130,9 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if c.CloneRoots == nil {
 		c.CloneRoots = def.CloneRoots
+	}
+	if c.Port <= 0 || c.Port > 65535 {
+		c.Port = def.Port
 	}
 	if c.IdleMinutes <= 0 {
 		c.IdleMinutes = def.IdleMinutes

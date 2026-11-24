@@ -110,6 +110,10 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	defer fl.Close()
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", s.Port))
+	if err != nil && s.Port != 0 {
+		// the preferred port is taken: any free port beats not starting
+		ln, err = net.Listen("tcp", "127.0.0.1:0")
+	}
 	if err != nil {
 		return err
 	}

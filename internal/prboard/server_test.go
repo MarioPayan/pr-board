@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -254,5 +255,24 @@ func TestSetupMessage(t *testing.T) {
 				t.Errorf("setup key present %v: %s", has, w.Body.String())
 			}
 		})
+	}
+}
+
+func TestPreferredPort(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	busy := ln.Addr().(*net.TCPAddr).Port
+	ln.Close()
+	// free preferred port: the server takes it
+	l, _ := startServer(t, tempPaths(t), &Server{Idle: time.Minute, Port: busy})
+	if l.Port != busy {
+		t.Fatalf("preferred port %d free, got %d", busy, l.Port)
+	}
+	// taken preferred port: the server still starts, on another port
+	l2, _ := startServer(t, tempPaths(t), &Server{Idle: time.Minute, Port: busy})
+	if l2.Port == busy || l2.Port == 0 {
+		t.Fatalf("preferred port %d taken, got %d", busy, l2.Port)
 	}
 }

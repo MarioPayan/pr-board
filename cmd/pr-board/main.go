@@ -167,6 +167,7 @@ func cmdServe(ctx context.Context) error {
 		Setup:   func() string { return setupNeeded(p) },
 		Cleaner: cleaner(cfg),
 		Idle:    time.Duration(cfg.IdleMinutes) * time.Minute,
+		Port:    cfg.Port,
 		Log:     lg,
 	}
 	err := s.Run(ctx)

@@ -24,12 +24,12 @@ The colour is the row's left bar:
 |---|---|
 | green | Ready to merge: not a draft, approved, every check passed and none running, mergeable, not behind, no branch rule blocking, no changes requested, no required PR still open |
 | yellow | Ready to approve: not a draft and everything above is in place except an approval |
-| red | Something missing: any other open PR (draft, CI failing or running, conflicts, behind, changes requested, a branch rule, a required PR still open); the icons say what |
+| red | Something missing: any other open PR (draft, CI failing or running, conflicts, behind, changes requested, a branch rule, a required PR still open); the icons say what. A draft keeps the red bar, dashed, but is counted as a draft, not as something missing |
 | purple | Merged, until Clean up removes it |
 
 Every open row has the same height and five columns: the number (a DRAFT tag on drafts), the repository and the branch it merges into (`web → main`), the title on one line (the full title in its tooltip), one signals row at most 220px wide that never wraps (signals that do not fit fold into a `+N` chip whose tooltip names each hidden one and its detail) and the Next step. Hovering a row lifts it and names its state. A draft's left bar is dashed. Merged rows are shorter and purple. Under 700px wide each row takes two lines: number, repository and title, then signals and Next. The info button in the header opens the legend drawer, which lists the colours, the rows, every signal in row order and the chains. The Auto / Light / Dark switch next to it sets the theme: Auto follows the system, the other two are remembered in the browser.
 
-The counters in the header (`● 2 ready to merge ● 3 ready to approve ● 8 something missing`) count your open PRs per colour; clicking one toggles that colour in the State filter. The tab title shows how many are ready to merge, `(2) PR Board`. Clean up shows the number of merged PRs it would clear as a badge, and is disabled when there are none.
+The counters in the header (`● 2 ready to merge ● 3 ready to approve ● 5 something missing ● 3 drafts`) count your open PRs per colour, with drafts apart in a muted fourth counter and out of the red one; clicking one toggles it in the State filter, which has a Drafts choice too. Each band's dots split its rows the same way. The tab title shows how many are ready to merge, `(2) PR Board`. Clean up shows the number of merged PRs it would clear as a badge, and is disabled when there are none.
 
 ### Groups
 
@@ -69,7 +69,7 @@ The filters, the grouping and the collapsed groups live in the URL fragment, so 
 http://127.0.0.1:<port>/#state=missing,approve&repo=web&q=checkout&cat=Checkout&merged=1&group=repo&rfold=infra
 ```
 
-State values are `ready`, `approve` and `missing`; `cat=~none` is "No category". `group=repo` is the repository view (absent: by category). `fold` lists the collapsed category bands (`~none` is Untagged) and `rfold` the collapsed repository bands. Clear resets the filters and keeps the grouping and the collapsed bands.
+State values are `ready`, `approve`, `missing` and `draft` (`missing` leaves drafts out); `cat=~none` is "No category". `group=repo` is the repository view (absent: by category). `fold` lists the collapsed category bands (`~none` is Untagged) and `rfold` the collapsed repository bands. Clear resets the filters and keeps the grouping and the collapsed bands.
 
 ### Required PRs
 
@@ -86,14 +86,15 @@ Name the PRs that must merge first anywhere in the description, outside fenced c
 `pr-board line` is the board in one statusline segment. It replaces PRmeter, which did the same from its own GitHub query; this one reads the board, so the segment and the page always say the same thing.
 
 ```text
-[PRs] ✗5 ◷2 ✓1 ⊙4
-      │  │  │  └ four are waiting on your review
+[PRs] ✗1 ◷2 ✓1 ✎4 ⊙4
+      │  │  │  │  └ four are waiting on your review
+      │  │  │  └ four of yours are drafts
       │  │  └ one of yours is ready to merge
       │  └ two of yours are ready to approve
-      └ five of yours have something missing
+      └ one of yours has something missing
 ```
 
-The counts are the page's header counters (red, yellow, green) and the To review band, in that order, so a draft counts as something missing here as it does on the page. A count of zero is left out, and `[PRs]` on its own means nothing is open. Shape carries the state as well as colour, so it still reads in a colourblind palette, in a pipe or under `NO_COLOR`. `[PRs]` is a hyperlink (OSC 8) to the board, `http://127.0.0.1:<port>/`: the running server's port, or the configured `port` when none runs. A terminal without OSC 8 shows the label.
+The counts are the page's header counters (red, yellow, green, drafts) and the To review band, in that order. A draft counts once, dim, under `✎`, and not as something missing, as on the page. A count of zero is left out, and `[PRs]` on its own means nothing is open. Shape carries the state as well as colour, so it still reads in a colourblind palette, in a pipe or under `NO_COLOR`. `[PRs]` is a hyperlink (OSC 8) to the board, `http://127.0.0.1:<port>/`: the running server's port, or the configured `port` when none runs. A terminal without OSC 8 shows the label.
 
 `pr-board list` spells it out from the same store, a row per pull request, yours first and then the ones to review, worst first:
 
@@ -101,13 +102,13 @@ The counts are the page's header counters (red, yellow, green) and the To review
 ⑂ acme  5 mine · 1 to review
  mine   ✗✗ web          4     Fix the checkout total when a coupon expires
         ✗✓ api          2     Retry the webhook on a 502
-        ◷· design-syst… 5     DRAFT Tokens for the dark theme
         ·◷ web          3     Explain the empty cart
         ✓✓ web          1     Cache the price list
+        ◷· design-syst… 5     DRAFT Tokens for the dark theme
  review ✓· api          9     Paginate the orders export
 ```
 
-Two lights per row, **CI on the left, review on the right**, and the number in its row's colour on the board:
+Two lights per row, **CI on the left, review on the right**, and the number in its header counter's colour (drafts grey, and last in their group):
 
 |        | CI                     | Review                  |
 | ------ | ---------------------- | ----------------------- |
@@ -149,7 +150,7 @@ Knobs (environment):
 | `PR_BOARD_REPO_CHARS` | `list`'s repository name cap (default `12`) |
 | `PR_BOARD_TITLE_CHARS` | `list`'s title cap (default `60`) |
 | `PR_BOARD_MAX` | `list`'s rows before `+ N more` (default `15`) |
-| `PR_BOARD_ASCII` | `1` forces ASCII glyphs (`x ~ + . @`), `0` forbids the fallback; unset uses ASCII when the locale is not UTF-8 |
+| `PR_BOARD_ASCII` | `1` forces ASCII glyphs (`x ~ + . d @`), `0` forbids the fallback; unset uses ASCII when the locale is not UTF-8 |
 | `NO_COLOR` | drop the colour and the hyperlink |
 
 ## Install

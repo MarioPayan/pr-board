@@ -59,6 +59,37 @@ func TestDemoStore(t *testing.T) {
 	if !slices.Contains(chips, "after design-system#88") {
 		t.Errorf("api#236 chips %q: want the cross-repo requirement", chips)
 	}
+	// every signal kind shows up on some open card, and every card keeps the fixed order
+	kinds := map[string]bool{}
+	drafts := 0
+	for _, r := range v.Repos {
+		for _, l := range r.Lanes {
+			for _, it := range l {
+				if it.Card == nil {
+					continue
+				}
+				if it.Card.Draft {
+					drafts++
+				}
+				for i, sg := range it.Card.Signals {
+					kinds[sg.K] = true
+					if i > 0 && signalSlot(it.Card.Signals[i-1].K) > signalSlot(sg.K) {
+						t.Errorf("%s: %s before %s", it.Card.Key, it.Card.Signals[i-1].K, sg.K)
+					}
+				}
+			}
+		}
+	}
+	for _, slot := range SignalOrder {
+		for _, k := range slot {
+			if !kinds[k] {
+				t.Errorf("no demo card shows %s", k)
+			}
+		}
+	}
+	if drafts == 0 {
+		t.Error("no draft in the demo")
+	}
 	if v.Merged < 4 {
 		t.Errorf("merged %d", v.Merged)
 	}

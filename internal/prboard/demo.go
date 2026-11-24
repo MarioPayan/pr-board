@@ -8,8 +8,9 @@ import (
 // DemoStore is a fictional board for `pr-board demo`, the screenshots and
 // the page tests: the org acme with four repositories, every colour at
 // least twice, a same-repo [required:] chain, a stacked branch, a
-// cross-repo requirement, a repo whose default branch is production, and
-// merged PRs.
+// cross-repo requirement, a repo whose default branch is production,
+// merged PRs, every signal at least once (a dismissed approval, a requested
+// team) and one card whose signals overflow into "+N".
 func DemoStore(now time.Time) *Store {
 	ago := func(d time.Duration) time.Time { return now.Add(-d) }
 	day := 24 * time.Hour
@@ -25,9 +26,6 @@ func DemoStore(now time.Time) *Store {
 			mod(&p)
 		}
 		p.Requires = ParseRequired(p.Body, p.Repo, p.Number)
-		for i := range p.Requires {
-			p.Requires[i].State = "OPEN"
-		}
 		return p
 	}
 	unapproved := func(p *PR, requests ...string) {
@@ -54,8 +52,11 @@ func DemoStore(now time.Time) *Store {
 		pr("api", 233, "[Billing] Prorate plan changes mid-cycle", func(p *PR) {
 			p.ReviewDecision = "CHANGES_REQUESTED"
 			p.Reviews = []Review{{Author: "bob", State: "CHANGES_REQUESTED"}}
+			p.Reviews = append(p.Reviews, Review{Author: "erin", State: "DISMISSED"})
+			p.Requests, p.MergeState, p.UpdatedAt = []string{"Dev"}, "BEHIND", ago(9*day)
 			p.ChecksFailing = []string{"integration (pg16)"}
 			p.Threads = []Thread{{}, {}}
+			p.Body = "[required:acme/web#399, acme/infra#40]"
 		}),
 		pr("api", 236, "[Design system] Serve the new icon set", func(p *PR) {
 			p.Body = "[required:acme/design-system#88]"
@@ -71,14 +72,17 @@ func DemoStore(now time.Time) *Store {
 		}),
 		pr("design-system", 90, "[Design system] Dark theme tokens for the icons", func(p *PR) {
 			p.Base = "icons-v2"
-			unapproved(p, "alice")
+			unapproved(p, "frontend-reviewers")
 		}),
 		pr("design-system", 91, "[Design system] Button sizes follow the 4px grid", func(p *PR) {
 			p.Mergeable, p.MergeState = "CONFLICTING", "DIRTY"
+			p.Reviews = append(p.Reviews, Review{Author: "erin", State: "DISMISSED"})
+			p.Body = "Needs the stored currency.\n\n[required:acme/api#229]"
 		}),
 		pr("design-system", 84, "[Design system] Focus rings on inputs", merged),
 
 		// infra deploys from production
+		pr("infra", 60, "Pin the base image digest", func(p *PR) { p.MergeState = "BLOCKED" }),
 		pr("infra", 57, "Raise the worker pool to 8", func(p *PR) {
 			p.ChecksPending = 3
 		}),
@@ -88,9 +92,18 @@ func DemoStore(now time.Time) *Store {
 		}),
 		pr("infra", 52, "Rotate the staging certificates", merged),
 	}
+	// a requirement takes the state of the PR it names: one on the board,
+	// web#399 closed without merging, anything else not found
+	state := map[string]string{"acme/web#399": "CLOSED"}
 	for i := range prs {
+		state[prs[i].Key()] = prs[i].State
 		if prs[i].Repo == "acme/infra" {
 			prs[i].Base, prs[i].DefaultBranch = "production", "production"
+		}
+	}
+	for i := range prs {
+		for j := range prs[i].Requires {
+			prs[i].Requires[j].State = state[prs[i].Requires[j].Key()]
 		}
 	}
 	return &Store{Refreshed: now, PRs: prs, Cleaned: []string{}}

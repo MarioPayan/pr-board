@@ -26,7 +26,7 @@ func TestDemoStore(t *testing.T) {
 	if len(states) != 4 {
 		t.Errorf("states %v", states)
 	}
-	for _, c := range []string{"Checkout", "Design system", "Search", "Billing", ""} {
+	for _, c := range []string{"Checkout", "Design system", "Search", "Billing", "Onboarding", "Reporting", ""} {
 		if !cats[c] {
 			t.Errorf("no PR with category %q", c)
 		}
@@ -50,7 +50,7 @@ func TestDemoStore(t *testing.T) {
 	for _, g := range v.Categories {
 		keys = append(keys, g.Key)
 	}
-	if got := strings.Join(keys, ","); got != "Billing,Checkout,Design system,Search," {
+	if got := strings.Join(keys, ","); got != "Billing,Checkout,Design system,Onboarding,Reporting,Search," {
 		t.Errorf("category order %q: want alphabetical, Untagged last", got)
 	}
 	// the cross-repo requirement: api#236 sits under design-system#88 in its category
@@ -65,6 +65,31 @@ func TestDemoStore(t *testing.T) {
 				}
 			}
 		}
+	}
+	// the busy week: a stack four PRs tall, two chains across repos and a PR
+	// that requires two open PRs (the second stays a chip)
+	for _, g := range v.Categories {
+		got := rowString(g)
+		switch g.Key {
+		case "Onboarding":
+			for _, want := range []string{"mobile#140 .mobile#142 ..mobile#144 ...mobile#146", "api#250 .mobile#148"} {
+				if !strings.Contains(got, want) {
+					t.Errorf("onboarding rows %q: want %q", got, want)
+				}
+			}
+		case "Reporting":
+			if !strings.Contains(got, "data#77 .data#82 .web#433 ..mobile#152") {
+				t.Errorf("reporting rows %q: want data#77 > web#433 > mobile#152 and data#82", got)
+			}
+			for _, r := range g.Rows {
+				if r.Key == "acme/data#82" && !slices.ContainsFunc(r.Signals, func(s Signal) bool { return s.K == "req_open" && s.Ref == "acme/api#244" }) {
+					t.Errorf("data#82 signals %+v: want the second requirement as a chip", r.Signals)
+				}
+			}
+		}
+	}
+	if total := v.Open + v.Merged; total < 55 || total > 65 {
+		t.Errorf("demo has %d PRs, want 55 to 65", total)
 	}
 	// every signal kind shows up on some open card, and every card keeps the fixed order
 	kinds := map[string]bool{}

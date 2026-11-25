@@ -1,6 +1,6 @@
 ---
 name: statusline
-description: Put PR Board's segment ([PRs] ✗5 ◷2 ✓1 ⊙4, linked to the board) in the Claude Code statusline. Use for "/pr-board:statusline", "add PR Board to my statusline", "wire pr-board line".
+description: Put PR Board's segment ([PRs] ✓1 ✗5 ◷2 ⊙4 ✎3, linked to the board) in the Claude Code statusline. Use for "/pr-board:statusline", "add PR Board to my statusline", "wire pr-board line".
 ---
 
 # statusline

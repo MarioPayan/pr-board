@@ -20,7 +20,7 @@ state. [The page in detail](docs/page.md) covers the colours, signals, chains, f
 Needs Go 1.26 and the [GitHub CLI](https://cli.github.com) logged in (`gh auth status`).
 
 ```sh
-go install github.com/MarioPayan/pr-board/cmd/pr-board@main
+go install github.com/MarioPayan/pr-board/cmd/pr-board@latest
 pr-board demo --open     # a fictional board: no GitHub login, none of your files touched
 pr-board up --open       # yours: start the server, or reuse it, and open the page
 ```

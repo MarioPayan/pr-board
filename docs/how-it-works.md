@@ -3,7 +3,7 @@
 ## Install
 
 ```sh
-go install github.com/MarioPayan/pr-board/cmd/pr-board@main   # into $GOBIN, or ~/go/bin
+go install github.com/MarioPayan/pr-board/cmd/pr-board@latest   # into $GOBIN, or ~/go/bin
 GOBIN=$HOME/.local/bin go install ./cmd/pr-board              # or from a clone
 ```
 

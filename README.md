@@ -1,176 +1,68 @@
 # PR Board
 
-A local page that lists your open GitHub pull requests: one full-width row per PR, grouped by the category in its title (or by repository), each with a left bar coloured by what it still needs. A PR that waits on another, stacked or required, sits under it, across repositories too. Merged PRs fold at the end of their group until you clean them up. A small Go server (`pr-board`) collects the data with your `gh` login; an optional Claude Code plugin keeps it alive while sessions run, and `pr-board line` puts the same counts in the Claude Code statusline. Everything on the board is derived from the PR itself; no model reads it.
+Every open pull request you wrote, on one local page, each row coloured by what it still
+needs: green to merge, yellow to approve, red when something is missing. A PR that waits on
+another sits right under it, across repositories too, and the same counts ride along in
+your Claude Code statusline.
 
-## Screenshots
+![PR Board in a browser on a fictional organization: header counters for ready to merge, something missing, ready to approve and drafts above a filter bar; a To review band with teammates' PRs that ask for your review; then one band per category, each PR a row with a coloured left bar, its number, repository and branch, title, signal chips and the next step](docs/images/board.svg)
 
-All screenshots come from `pr-board demo`, a fictional organization.
+## What you are looking at
 
-![The board in light mode, grouped by category, with the PRs to review on top: green, yellow and red rows, a required-PR chain, a stacked branch and a chain across two repositories](docs/screenshots/pr-board-light.png)
+![One band annotated: the category from the title, its repositories, open PRs per colour and the merged count; then each row's left bar colour, number, repository and target branch, title without its category tag, signal chips and next step, with a PR that waits on #412 indented under it. Below, the bar colours and every signal chip with its meaning](docs/images/anatomy.svg)
 
-![The same board in dark mode](docs/screenshots/pr-board-dark.png)
+Every value is read from the PR itself: its title, description, reviews, checks and merge
+state. [The page in detail](docs/page.md) covers the colours, signals, chains, filters and
+`[required:]`, with real screenshots.
 
-![The legend drawer open on the right, with the colours, the rows, the signals in row order and the chains](docs/screenshots/pr-board-legend.png)
+## Get it
 
-![Filtered to two repositories and two states: each chain stays whole, the PRs that do not match are dimmed](docs/screenshots/pr-board-filtered.png)
-
-![Grouped by repository: one band per repository with its branch and merged count, the category as a pill on each row, the PRs to review on top](docs/screenshots/pr-board-repo.png)
-
-## What the page shows
-
-The colour is the row's left bar:
-
-| Colour | Meaning |
-|---|---|
-| green | Ready to merge: not a draft, approved, every check passed and none running, mergeable, not behind, no branch rule blocking, no changes requested, no required PR still open |
-| yellow | Ready to approve: not a draft and everything above is in place except an approval |
-| red | Something missing: any other open PR (draft, CI failing or running, conflicts, behind, changes requested, a branch rule, a required PR still open); the icons say what. A draft keeps the red bar, dashed, but is counted as a draft, not as something missing |
-| purple | Merged, until Clean up removes it |
-
-Every open row has the same height and five columns: the number (a DRAFT tag on drafts), the repository and the branch it merges into (`web → main`), the title on one line (the full title in its tooltip), one signals row at most 220px wide that never wraps (signals that do not fit fold into a `+N` chip whose tooltip names each hidden one and its detail) and the Next step. Hovering a row lifts it and names its state. A draft's left bar is dashed. Merged rows are shorter and purple. Under 700px wide each row takes two lines: number, repository and title, then signals and Next. The info button in the header opens the legend drawer, which lists the colours, the rows, every signal in row order and the chains. The Auto / Light / Dark switch next to it sets the theme: Auto follows the system, the other two are remembered in the browser.
-
-The counters in the header (`● 2 ready to merge ● 5 something missing ● 3 ready to approve ● 3 drafts`), in order of importance, count your open PRs per colour, with drafts apart in a muted fourth counter and out of the red one; clicking one toggles it in the State filter, which has a Drafts choice too. Each band's dots split its rows the same way, in the same order. The tab title shows how many are ready to merge, `(2) PR Board`. Clean up shows the number of merged PRs it would clear as a badge, and is disabled when there are none.
-
-### Groups
-
-By default the rows are grouped by category: the first token in square brackets in the title (`[Checkout]`, `[Design system]`), each bracket split on `|`, skipping the repository's own name (`[web]`), issue keys (`[WEB-123]`) and `required:` lists. Categories are listed alphabetically and PRs without one go in **Untagged**, last. Each band shows the category, the repositories it spans, its colour counts and how many merged PRs are on the board; inside it the rows drop their own `[Category]` tag from the title. A band stays at the top of the window while you scroll through its group.
-
-The By category / By repo switch in the filter bar groups them per repository instead: the band shows `owner/repo → branch`, the colour counts and how many merged PRs are on the board, each row shows only `→ branch`, and the category is a pill after the signals. Click a band to collapse it.
-
-### To review
-
-Open PRs by others that request your review (`review-requested:@me` in the configured owners) sit in one compact band above the groups, in both views: number, repository, title, signals and the author. The band states how many there are; they are not in the colour counters or the "Showing N of M" count, never join a chain, and Clean up never touches them. When the review is no longer requested or the PR closes, it leaves the board on the next refresh.
-
-### Chains
-
-A PR waits on another when its base is that PR's branch (a stack, same repository) or when its description requires an open PR on the board (`[required:...]`, any repository; when several qualify, the first). It is shown right under that PR, indented, with an elbow and an `after #412` or `after repo#90` label, and the required chip it would have repeated is dropped. When the PR it waits on is in another group, it stays in its own group with the label and no elbow.
-
-The signals always come in the same order, so each one sits in the same place on every row. Each has a tooltip with the detail (which jobs fail, who approved, who dismissed):
-
-| Signal | Shows |
-|---|---|
-| CI | the letters `CI` with a check (green), a cross and the failing count (red) or a stopwatch and the running count (amber) |
-| Review | the letters `RV` with a check (approved), a cross (changes requested) or an undo arrow (approval dismissed); always right after CI, and both letter chips have a border in their colour so the two read apart |
-| Reviewer | a person with a plus (no reviewer requested), or a person with a clock and the requested login or team, cut at about 12 characters |
-| Conflicts | two branches joining, with a cross |
-| Behind | sync arrows |
-| Branch rule | a shield with a cross: approved and green, but a rule still blocks the merge |
-| Required PRs | a left chevron and `after #412` or `after repo#90`, for requirements that are not a chain (see below) |
-| Threads | a speech bubble and the count of unresolved threads |
-| Stale | an hourglass and the days since the last update, after 10 |
-
-### Filters
-
-The bar under the header filters the rows on the page: a search over number, title and branch (`/` focuses it, Escape leaves it), Repo, State and Category (with "No category") multi-selects, and a Show merged switch (off by default; each group then gets a "N merged" fold that opens its merged rows). A chain is shown whole when any PR in it matches, with the others dimmed, so the merge order stays visible; a group with nothing left hides. "Showing N of M open" counts the matching open PRs, and Clear resets everything.
-
-The filters, the grouping and the collapsed groups live in the URL fragment, so a link reproduces the view:
-
-```text
-http://127.0.0.1:<port>/#state=missing,approve&repo=web&q=checkout&cat=Checkout&merged=1&group=repo&rfold=infra
-```
-
-State values are `ready`, `missing`, `approve` and `draft` (`missing` leaves drafts out); `cat=~none` is "No category". `group=repo` is the repository view (absent: by category). `fold` lists the collapsed category bands (`~none` is Untagged) and `rfold` the collapsed repository bands. Clear resets the filters and keeps the grouping and the collapsed bands.
-
-### Required PRs
-
-Name the PRs that must merge first anywhere in the description, outside fenced code:
-
-```text
-[required:acme/infra#478, acme:design-system#12, api#4021, #4543]
-```
-
-`owner/repo#N` and `owner:repo#N` are full references, `repo#N` uses the PR's owner, `#N` its repository. The keyword is case-insensitive, several blocks merge, and malformed items are skipped. An open PR on the board, in any repository, becomes the row's parent (see Chains; when several qualify, the first one, and the rest stay chips). Every other requirement is a chevron chip, "after repo#N", coloured by the target's state, which the collector looks up with one extra GraphQL query when the target is not on the board: green when merged, amber when open, red when closed without merging, amber "not found" when GitHub does not know it. Any requirement that is not merged makes the row red with "merge #N first".
-
-## Statusline
-
-`pr-board line` is the board in one statusline segment. It replaces PRmeter, which did the same from its own GitHub query; this one reads the board, so the segment and the page always say the same thing.
-
-```text
-[PRs] ✓1 ✗1 ◷2 ⊙4 ✎4
-      │  │  │  │  └ four of yours are drafts
-      │  │  │  └ four are waiting on your review
-      │  │  └ two of yours are ready to approve
-      │  └ one of yours has something missing
-      └ one of yours is ready to merge
-```
-
-The counts come by importance: the page's header counters green, red and yellow, then the To review band, then your drafts last. A draft counts once, dim, under `✎`, and not as something missing, as on the page. A count of zero is left out, and `[PRs]` on its own means nothing is open. Shape carries the state as well as colour, so it still reads in a colourblind palette, in a pipe or under `NO_COLOR`. `[PRs]` is a hyperlink (OSC 8) to the board, `http://127.0.0.1:<port>/`: the running server's port, or the configured `port` when none runs. A terminal without OSC 8 shows the label.
-
-`pr-board list` spells it out from the same store, a row per pull request, yours first and then the ones to review, worst first:
-
-```text
-⑂ acme  5 mine · 1 to review
- mine   ✗✗ web          4     Fix the checkout total when a coupon expires
-        ✗✓ api          2     Retry the webhook on a 502
-        ·◷ web          3     Explain the empty cart
-        ✓✓ web          1     Cache the price list
-        ◷· design-syst… 5     DRAFT Tokens for the dark theme
- review ✓· api          9     Paginate the orders export
-```
-
-Two lights per row, **CI on the left, review on the right**, and the number in its header counter's colour (drafts grey, and last in their group):
-
-|        | CI                     | Review                  |
-| ------ | ---------------------- | ----------------------- |
-| **✓**  | every check passed     | approved                |
-| **◷**  | still running          | a reviewer is requested |
-| **✗**  | failing, or a conflict | changes requested       |
-| **·**  | the repo has no checks | nobody has been asked   |
-
-A conflict is a red CI light: it blocks the merge and it is yours to fix, as a failing check is. `·` is the honest fourth state: a PR nobody has been asked to review is not "waiting", and a repository with no CI is not "passing". `pr-board legend` prints this key in the terminal.
-
-Why it is shaped like this:
-
-| | |
-|---|---|
-| **Already on screen** | You never ask. Asking costs a round trip and some context |
-| **Not a session hook** | A `SessionStart` hook feeds the *model*, not you: Claude Code prints none of its stdout |
-| **One call** | `line` reads `prs.json` and the lock file; it never calls GitHub or the server, and takes a few milliseconds |
-| **Never waits** | When the lock names no live server, `line` prints first and then starts one detached, so the link opens a live page and the board is refreshed; the server keeps refreshing itself every 5 minutes |
-| **Never shouts** | No store yet, an unreadable store, no config: it prints nothing rather than an error |
-| **Never lies** | A store more than 20 minutes old (four refresh windows, so a failing refresh rather than a due one) says how old it is: `(stale 25m)` |
-
-Because `line` starts the server, a `pr-board stop` lasts until the statusline's next refresh while a Claude session is open.
-
-To wire it, run `/pr-board:statusline` from the plugin, or the script it runs:
+Needs Go 1.26 and the [GitHub CLI](https://cli.github.com) logged in (`gh auth status`).
 
 ```sh
-sh plugin/scripts/wire-statusline.sh           # append the line to ~/.claude/statusline.sh
-sh plugin/scripts/wire-statusline.sh --print   # change nothing, print the line
+go install github.com/MarioPayan/pr-board/cmd/pr-board@main
+pr-board demo --open     # a fictional board: no GitHub login, none of your files touched
+pr-board up --open       # yours: start the server, or reuse it, and open the page
 ```
 
-A plugin cannot set the statusline itself (`statusLine` is a user setting, and no plugin component sets it), so the script appends one line to `~/.claude/statusline.sh` after copying it to `statusline.sh.before-pr-board`, or writes that file when there is none. It sets `statusLine` in `settings.json` only when nothing sets it yet, and a second run changes nothing. It also says so when the script still runs `prmeter`.
+The first run writes `~/.config/pr-board/config.json`. List the GitHub users or
+organizations to search under `"owners"`; until you do, the page says where to add them.
 
-Knobs (environment):
-
-| | |
-|---|---|
-| `PR_BOARD_LABEL` | what the segment answers to (default `[PRs]`, `""` drops it) |
-| `PR_BOARD_LINK` | where the label points (default the board, `""` unlinks it) |
-| `PR_BOARD_REPO_CHARS` | `list`'s repository name cap (default `12`) |
-| `PR_BOARD_TITLE_CHARS` | `list`'s title cap (default `60`) |
-| `PR_BOARD_MAX` | `list`'s rows before `+ N more` (default `15`) |
-| `PR_BOARD_ASCII` | `1` forces ASCII glyphs (`x ~ + . d @`), `0` forbids the fallback; unset uses ASCII when the locale is not UTF-8 |
-| `NO_COLOR` | drop the colour and the hyperlink |
-
-## Install
+To keep the board alive while you work and put it in the statusline, add the Claude Code
+plugin:
 
 ```sh
-GOBIN=$HOME/.local/bin go install ./cmd/pr-board     # from a clone
-```
-
-Needs `gh` logged in (`gh auth status`) and, for the session check-in and cleanup's live-session check, `claude` on `PATH`.
-
-The Claude Code plugin lives in `plugin/`; the repository root is a one-plugin marketplace:
-
-```sh
-claude plugin marketplace add /path/to/pr-board
+claude plugin marketplace add MarioPayan/pr-board
 claude plugin install pr-board@pr-board
 ```
 
-It adds a SessionStart hook, the `/pr-board` skill and the `/pr-board:statusline` skill (see Statusline). The hook looks for `pr-board` on `PATH`, then in `~/.local/bin` and `~/go/bin`, and exits 0 without doing anything when it is missing.
+Its SessionStart hook starts the board with each session, `/pr-board` opens it, and
+`/pr-board:statusline` [wires the segment](docs/terminal.md) into your statusline after
+backing up what is there.
 
-## Usage
+## Why
+
+| | |
+|---|---|
+| **What to do next** | Each row says what is missing and the next step: merge, wait for a reviewer, fix failing CI, merge #412 first |
+| **Merge order in sight** | A stacked branch, or `[required:api#4021]` in a description, puts the PR under the one it waits on, in any repository |
+| **Your reviews too** | Teammates' PRs that request your review sit in their own band on top, out of your counts |
+| **No token, no model** | GitHub access is your `gh` login, and every value is derived from the PR; nothing is summarised or guessed |
+| **Local only** | The server binds `127.0.0.1`, checks the `Host` header and wants its own header on every POST, so no other web page can drive it |
+| **Gone when idle** | One server per machine; by default it exits 10 minutes after the last check-in from an open page or a Claude session |
+| **Clean up asks first** | It deletes merged branches and their worktrees only after showing the plan, and keeps any with uncommitted changes, unpushed commits or a live Claude session |
+| **Cheap in the statusline** | `pr-board line` reads one file and never calls GitHub: 5.7 ms median on the 50-PR demo board, [measured](docs/terminal.md) |
+
+## In the terminal
+
+![A terminal running pr-board list on the fictional demo board: one row per pull request with a CI light and a review light, the repository, the number in its state's colour and the title, worst first; along the bottom, the statusline segment [PRs] with its five counts](docs/images/terminal.svg)
+
+`pr-board line` is the statusline segment: ready to merge, something missing, ready to
+approve, waiting on your review and drafts, the label linked to the board. `pr-board list`
+spells it out a row per PR, and `pr-board legend` prints the key.
+[In the terminal](docs/terminal.md) has the glyphs, the knobs and the wiring.
+
+## Commands
 
 ```sh
 pr-board                              # same as pr-board up
@@ -178,59 +70,16 @@ pr-board up [--session ID] [--open]   # start the server or reuse the running on
 pr-board refresh                      # collect from GitHub now
 pr-board cleanup [--dry-run] [--yes]  # print the cleanup plan; without --dry-run ask y/N, then run it
 pr-board status                       # pid, port, idle deadline, who checked in
-pr-board line                         # the statusline segment (see Statusline)
+pr-board stop
+pr-board line                         # the statusline segment
 pr-board list                         # a row per open PR, in the terminal
 pr-board legend                       # what the segment's and list's glyphs mean
-pr-board stop
-pr-board collect --json               # collect once without a server and print store, derived state and view
-pr-board demo [--port N] [--open]     # serve the fictional demo board until Ctrl-C (also: pr-board --demo)
+pr-board demo [--port N] [--open]     # serve the fictional demo board until Ctrl-C
 ```
 
-`refresh` and `cleanup` start the server when none runs, and so does `line`, detached and after printing; `status`, `stop`, `list` and `legend` never do. `demo` needs no GitHub login and touches none of the files below: it runs from a temporary directory, apart from the real server, and has no cleanup.
+**[How it works](docs/how-it-works.md)**: configuration, files, collecting, the safety
+rules behind Clean up, and development.
 
-Config: `~/.config/pr-board/config.json`, written with these defaults on first run:
+## License
 
-```json
-{"owners":[],"author":"@me","merged_days":7,"clone_roots":["~/repos","~/src","~/code"],"idle_minutes":10,"port":7878}
-```
-
-`owners` lists the GitHub users or organizations to search; until it names one, the page shows where to add them instead of an empty board. The server reads the config on every refresh, so no restart is needed.
-
-Files: `~/.local/state/pr-board/server.json` (lock: pid, port, start time), `server.log`, `loops/<session>.lock`; `~/.local/share/pr-board/prs.json` (the board, written atomically).
-
-Upgrading from pr-map: on the first run, when `~/.config/pr-board/config.json` or `~/.local/share/pr-board/` is missing and the old `pr-map` one exists, it is moved over (the config, and `prs.json` with the list of cleaned-up PRs). The old state directory is left alone; stop the old server with `pr-map stop`.
-
-## How it runs
-
-- **One server per machine.** `pr-board up` reuses the server named in the lock file after checking that its pid is alive and that `/api/health` on its port answers with that pid; otherwise it starts a new one detached. The server holds an exclusive `flock`, so two racing starts end with one server. It binds `127.0.0.1:7878` (the config's `port`), so a saved link keeps working across restarts, and falls back to a free port when that one is taken.
-- **Collecting.** On start, on Refresh and every 5 minutes: `gh search prs` for your open PRs, those merged in the last `merged_days` and the open PRs that request your review, then batched `gh api graphql` queries (15 PRs each) for review, check, merge and thread state. Merged PRs stay on the board until cleaned up; closed-unmerged ones leave it.
-- **Staying alive.** Start counts as a check-in, and so does every heartbeat: each Claude session's loop posts one every 3 minutes, and an open page posts one every 60 seconds and re-fetches the board every 5 minutes. The server exits `idle_minutes` after the last check-in and removes its lock file.
-- **Session check-in.** The SessionStart hook runs `pr-board up` for the session and starts a detached `pr-board session-loop`, which posts a heartbeat every 3 minutes and exits when `claude agents --json` no longer lists its session.
-
-## Safety rules
-
-- **Local only.** Every request must carry `Host: 127.0.0.1:<port>` or `localhost:<port>`, which blocks DNS rebinding. Every POST must carry `X-PR-Board: 1`, and if it has an `Origin` it must be the server's own; another web page can therefore not trigger a refresh, a stop or a cleanup.
-- **Clean up asks first.** `GET /api/cleanup` only plans and returns a one-time token valid for 10 minutes; `POST /api/cleanup` spends it, plans those PRs again against the current disk, and runs that plan. The page shows the plan before the Clean up button; the CLI prints it and asks y/N unless `--yes`.
-- **What Clean up deletes, per merged PR:**
-  - the GitHub head branch (`gh api -X DELETE repos/O/R/git/refs/heads/B`), only if it still exists, lives in the same repository (not a fork) and is not the default branch;
-  - local worktrees on that branch, in clones under `clone_roots` (3 levels deep, symlinked roots counted once) whose remote is that repository;
-  - the local branch.
-- **What it keeps, and says why:** a worktree with uncommitted changes, a HEAD commit younger than 30 minutes, or a live Claude session inside it (`claude agents --json` cwd); the main clone's own checkout; a local branch whose tip is neither the PR head nor an ancestor of it (unpushed work; when the PR head commit is not in the clone, it is fetched from `pull/N/head` first, and a head that still cannot be found keeps the branch as "could not verify"); any branch named like the default branch. A PR with anything kept or failed stays on the board, so a second Clean up can finish it.
-- The hook never blocks or fails a session: it exits 0 on every path.
-- No tokens: GitHub access is your `gh` login.
-
-## Development
-
-```sh
-go vet ./... && go test ./...
-```
-
-The README screenshots come from the demo board:
-
-```sh
-node scripts/shots.mjs     # builds pr-board, serves the demo on a free port, writes docs/screenshots/, stops it
-```
-
-It runs Playwright through `npx` (nothing is added to the repository) and needs its Chromium once: `npx playwright install chromium`. It prints the row heights per kind and any console error for each screenshot.
-
-Tests cover the colour rules, the fixed signal order, chains across repositories, grouping by category and repository, the GraphQL parser on a recorded-shape fixture, collection merges and the PRs to review, the Host/Origin/header guard, idle exit, singleton reuse and stale locks, the session loop's exit, loading an old store, moving the old pr-map files, the setup message, the demo board, the statusline segment (counts, zeros, empty store, stale age, ASCII, `NO_COLOR`, the link and when it starts a server) and the `list` block, and the cleanup skip rules on temporary git repositories with a fake `gh`, including a PR head that has to be fetched first.
+[MIT](LICENSE)

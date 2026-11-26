@@ -26,6 +26,10 @@ var ErrRunning = errors.New("another pr-board server is running")
 
 const tokenFor = 10 * time.Minute
 
+// refreshTimeout bounds one refresh, which no longer ends with the request
+// that asked for it.
+const refreshTimeout = 3 * time.Minute
+
 // Server is the local pr-board server.
 type Server struct {
 	Paths        Paths
@@ -50,6 +54,7 @@ type Server struct {
 	tokens  map[string]token
 	port    int
 	started time.Time
+	step    string // what the running refresh is doing, "" when idle
 	stopc   chan struct{}
 	stopped sync.Once
 
@@ -186,14 +191,25 @@ func (s *Server) refreshLoop(ctx context.Context) {
 	}
 }
 
+func (s *Server) setStep(step string) {
+	s.mu.Lock()
+	s.step = step
+	s.mu.Unlock()
+}
+
 // Refresh collects once and saves the store. A failed collect keeps the old
-// data and records the error for the page.
+// data and records the error for the page. While it runs, /api/health's
+// progress names the step.
 func (s *Server) Refresh(ctx context.Context) error {
 	if s.Collect == nil {
 		return nil
 	}
 	s.refreshMu.Lock()
 	defer s.refreshMu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
+	defer cancel()
+	ctx = WithProgress(ctx, s.setStep)
+	defer s.setStep("")
 	s.mu.Lock()
 	prev := s.store
 	s.mu.Unlock()
@@ -289,7 +305,7 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 		clients[c] = t.Format(time.RFC3339)
 	}
 	out := map[string]any{"ok": true, "pid": os.Getpid(), "port": s.port, "started": s.started,
-		"last_checkin": s.last, "idle_exit": s.last.Add(s.Idle), "clients": clients}
+		"last_checkin": s.last, "idle_exit": s.last.Add(s.Idle), "clients": clients, "progress": s.step}
 	s.mu.Unlock()
 	writeJSON(w, 200, out)
 }
@@ -309,7 +325,8 @@ func (s *Server) view() View {
 func (s *Server) prs(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, s.view()) }
 
 func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
-	if err := s.Refresh(r.Context()); err != nil {
+	// a reload or a closed tab must not kill gh halfway through the refresh
+	if err := s.Refresh(context.WithoutCancel(r.Context())); err != nil {
 		writeJSON(w, 502, map[string]string{"error": err.Error()})
 		return
 	}

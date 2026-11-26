@@ -384,12 +384,22 @@ func cmdDemo(ctx context.Context, args []string, out io.Writer) error {
 	if err := prboard.SaveStore(p.Store(), prboard.DemoStore(time.Now())); err != nil {
 		return err
 	}
+	first := true
 	s := &prboard.Server{
 		Paths: p,
 		Port:  *port,
 		Idle:  24 * time.Hour,
 		Collect: func(ctx context.Context, prev *prboard.Store) (*prboard.Store, error) {
 			st := prboard.DemoStore(time.Now())
+			// later refreshes walk the real steps, so Refresh shows its progress;
+			// the one on start stays instant for the screenshot scripts
+			if !first {
+				for _, step := range []string{"Finding your pull requests…", fmt.Sprintf("Fetching details for %d PRs…", len(st.PRs)), "Checking required PRs…"} {
+					prboard.Progress(ctx, step)
+					time.Sleep(700 * time.Millisecond)
+				}
+			}
+			first = false
 			if prev != nil {
 				st.Cleaned = prev.Cleaned
 			}

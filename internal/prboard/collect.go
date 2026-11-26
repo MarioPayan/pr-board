@@ -403,10 +403,26 @@ func (c Collector) resolveRequired(ctx context.Context, prs []PR, fetched []PR) 
 	return errs
 }
 
+type progressKey struct{}
+
+// WithProgress returns ctx carrying report, which Collect calls with a short,
+// plain-language line as it starts each step.
+func WithProgress(ctx context.Context, report func(step string)) context.Context {
+	return context.WithValue(ctx, progressKey{}, report)
+}
+
+// Progress reports step to the func WithProgress put in ctx, if any.
+func Progress(ctx context.Context, step string) {
+	if f, ok := ctx.Value(progressKey{}).(func(string)); ok {
+		f(step)
+	}
+}
+
 // Collect runs discovery and fetch, and merges the result into the previous
 // store: the cleaned list carries over, merged PRs stay until a
 // cleanup drops them, closed-unmerged PRs leave the map.
 func (c Collector) Collect(ctx context.Context, prev *Store) (*Store, error) {
+	Progress(ctx, "Finding your pull requests…")
 	refs, toReview, err := c.Discover(ctx)
 	if err != nil {
 		return nil, err
@@ -425,6 +441,7 @@ func (c Collector) Collect(ctx context.Context, prev *Store) (*Store, error) {
 			want = append(want, r)
 		}
 	}
+	Progress(ctx, fmt.Sprintf("Fetching details for %d PRs…", len(want)))
 	prs, errs, err := c.Fetch(ctx, want)
 	if err != nil {
 		return nil, err
@@ -446,6 +463,7 @@ func (c Collector) Collect(ctx context.Context, prev *Store) (*Store, error) {
 			}
 		}
 	}
+	Progress(ctx, "Checking required PRs…")
 	errs = append(errs, c.resolveRequired(ctx, next.PRs, prs)...)
 	slices.SortFunc(next.PRs, func(a, b PR) int {
 		if a.Repo != b.Repo {

@@ -40,6 +40,9 @@ html,body{margin:0;background:var(--bg)}
 .pb-top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-bottom:12px}
 .pb-top h1{font-family:var(--display);font-size:1.5rem;margin:0}
 .pb-top .when{color:var(--muted);font-size:.85rem}
+.pb-top .when.busy{color:var(--fg);animation:pb-pulse 1.4s ease-in-out infinite alternate}
+@keyframes pb-pulse{to{opacity:.55}}
+@media (prefers-reduced-motion:reduce){.pb-top .when.busy{animation:none}}
 .pb-top .sp{flex:1}
 .pb-btn{font:600 .85rem var(--body);border:1px solid var(--line);color:var(--fg);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer}
 .pb-btn.pur{border-color:var(--purple);color:var(--purple)}
@@ -191,7 +194,7 @@ html,body{margin:0;background:var(--bg)}
 <div id="app">
   <div class="pb-top">
     <h1>PR Board</h1>
-    <span class="when" id="pb-when">loading…</span>
+    <span class="when" id="pb-when" role="status">loading…</span>
     <div class="pb-ctr" id="pb-ctr" role="group" aria-label="Filter by colour" hidden></div>
     <span class="sp"></span>
     <span class="pb-gb" id="pb-theme" role="group" aria-label="Theme"><button type="button" data-t="auto" aria-pressed="true" title="Follow the system">Auto</button><button type="button" data-t="light" aria-pressed="false">Light</button><button type="button" data-t="dark" aria-pressed="false">Dark</button></span>
@@ -500,6 +503,7 @@ html,body{margin:0;background:var(--bg)}
   function render(v){
     view=v;
     const t=v.refreshed&&!v.refreshed.startsWith("0001")?new Date(v.refreshed).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"never";
+    $("pb-when").classList.remove("busy");
     $("pb-when").textContent=`${v.open} open · ${v.merged} merged · refreshed ${t}`;
     const btn=$("pb-cleanup");
     btn.disabled=!v.merged; btn.innerHTML=v.merged?`Clean up <span class="bdg">${esc(v.merged)}</span> merged`:"Clean up";
@@ -537,9 +541,17 @@ html,body{margin:0;background:var(--bg)}
   }
   const load=()=>api("GET","/api/prs").then(render).catch(e=>{$("pb-err").hidden=false;$("pb-err").textContent="pr-board server unreachable: "+e.message});
   const beat=()=>api("POST","/api/heartbeat",{client:"page"}).catch(()=>{});
+  // while a refresh runs (Refresh, or the server's own every 5 minutes) the
+  // header names its step; when it ends the board reloads
+  let busy=false;
+  const poll=()=>{if(!document.hidden)api("GET","/api/health").then(h=>{
+    const w=$("pb-when");
+    if(h.progress){busy=true;w.classList.add("busy");w.textContent=h.progress}
+    else if(busy){busy=false;load()}
+  }).catch(()=>{})};
 
   $("pb-refresh").addEventListener("click",async()=>{
-    const b=$("pb-refresh");b.disabled=true;b.textContent="Refreshing…";
+    const b=$("pb-refresh");b.disabled=true;b.textContent="Refreshing…";setTimeout(poll,150);
     try{render(await api("POST","/api/refresh"))}catch(e){$("pb-err").hidden=false;$("pb-err").textContent=e.message}
     b.disabled=false;b.textContent="Refresh";
   });
@@ -584,6 +596,7 @@ html,body{margin:0;background:var(--bg)}
   // last one); the board itself reloads every 5 minutes, as the server collects
   setInterval(beat,60000);
   setInterval(load,300000);
+  setInterval(poll,1500);
 })();
 </script>
 </body>

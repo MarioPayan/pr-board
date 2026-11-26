@@ -276,3 +276,78 @@ func TestPreferredPort(t *testing.T) {
 		t.Fatalf("preferred port %d taken, got %d", busy, l2.Port)
 	}
 }
+
+// blockingCollect reports a step, signals started and waits for release; it
+// fails when its context ended meanwhile, as gh does when it is killed.
+func blockingCollect(started, release chan struct{}) func(context.Context, *Store) (*Store, error) {
+	return func(ctx context.Context, prev *Store) (*Store, error) {
+		Progress(ctx, "Fetching details for 3 PRs…")
+		close(started)
+		<-release
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return &Store{PRs: []PR{openPR(1, "a", "main")}}, nil
+	}
+}
+
+func healthProgress(t *testing.T, h http.Handler) string {
+	t.Helper()
+	r := httptest.NewRequest("GET", "/api/health", nil)
+	r.Host = "127.0.0.1:4321"
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	var out struct {
+		Progress *string `json:"progress"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil || out.Progress == nil {
+		t.Fatalf("health has no progress: %v %s", err, w.Body.String())
+	}
+	return *out.Progress
+}
+
+func TestRefreshProgress(t *testing.T) {
+	started, release := make(chan struct{}), make(chan struct{})
+	s := &Server{port: 4321, Paths: tempPaths(t), Collect: blockingCollect(started, release)}
+	s.init()
+	s.store = &Store{}
+	h := s.Handler()
+	if got := healthProgress(t, h); got != "" {
+		t.Errorf("progress before a refresh: %q", got)
+	}
+	done := make(chan error, 1)
+	go func() { done <- s.Refresh(context.Background()) }()
+	<-started
+	if got := healthProgress(t, h); got != "Fetching details for 3 PRs…" {
+		t.Errorf("progress while collecting: %q", got)
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if got := healthProgress(t, h); got != "" {
+		t.Errorf("progress after the refresh: %q", got)
+	}
+}
+
+func TestRefreshOutlivesRequest(t *testing.T) {
+	started, release := make(chan struct{}), make(chan struct{})
+	s := &Server{port: 4321, Paths: tempPaths(t), Collect: blockingCollect(started, release)}
+	s.init()
+	s.store = &Store{}
+	ctx, cancel := context.WithCancel(context.Background())
+	r := httptest.NewRequestWithContext(ctx, "POST", "/api/refresh", nil)
+	r.Host = "127.0.0.1:4321"
+	r.Header.Set("X-PR-Board", "1")
+	w := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() { s.Handler().ServeHTTP(w, r); close(done) }()
+	<-started
+	cancel() // the page reloads or the tab closes mid-refresh
+	close(release)
+	<-done
+	v := s.view()
+	if len(v.Errors) != 0 || v.Open != 1 {
+		t.Errorf("refresh died with its request: errors %v, open %d (%d %s)", v.Errors, v.Open, w.Code, w.Body.String())
+	}
+}

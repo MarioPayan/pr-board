@@ -148,9 +148,13 @@ func TestCollectMerge(t *testing.T) {
 	prev := &Store{PRs: []PR{prevMerged}, Cleaned: []string{"acme/app#5"}}
 	c := Collector{Cfg: DefaultConfig(), Run: f.run, Now: func() time.Time { return now }}
 	c.Cfg.Owners = []string{"acme"}
-	st, err := c.Collect(context.Background(), prev)
+	var steps []string
+	st, err := c.Collect(WithProgress(context.Background(), func(s string) { steps = append(steps, s) }), prev)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if got := strings.Join(steps, " | "); got != "Finding your pull requests… | Fetching details for 4 PRs… | Checking required PRs…" {
+		t.Errorf("progress steps: %s", got)
 	}
 	var keys []string
 	for _, p := range st.PRs {

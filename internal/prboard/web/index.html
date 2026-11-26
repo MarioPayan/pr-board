@@ -36,19 +36,27 @@
 html,body{margin:0;background:var(--bg)}
 #app{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.45;padding:20px;min-height:100vh;container-type:inline-size}
 #app a{color:inherit}
+#app.toasting{padding-bottom:calc(var(--toast-h,0px) + 40px)}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.pb-top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin-bottom:12px}
-.pb-top h1{font-family:var(--display);font-size:1.5rem;margin:0}
-.pb-top .when{color:var(--muted);font-size:.85rem}
-.pb-top .when.busy{color:var(--fg);animation:pb-pulse 1.4s ease-in-out infinite alternate}
-@keyframes pb-pulse{to{opacity:.55}}
-@media (prefers-reduced-motion:reduce){.pb-top .when.busy{animation:none}}
-.pb-top .sp{flex:1}
-.pb-btn{font:600 .85rem var(--body);border:1px solid var(--line);color:var(--fg);background:var(--surface);border-radius:6px;padding:6px 12px;cursor:pointer}
+
+/* the command bar: name, search, the counters as a filter, theme, legend,
+   Refresh and Clean up; it stays at the top while the board scrolls */
+.pb-top{position:sticky;top:0;z-index:10;display:grid;grid-template-columns:auto minmax(200px,1fr) auto auto auto;grid-template-areas:"brand q ctr theme tools";align-items:center;gap:12px;margin:-20px -20px 14px;padding:10px 20px;background:color-mix(in srgb,var(--bg) 84%,transparent);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.pb-top .brand{grid-area:brand;display:flex;align-items:baseline;gap:10px;min-width:0}
+.pb-top h1{font:600 1.15rem var(--display);margin:0;white-space:nowrap}
+.pb-top .when{color:var(--muted);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pb-hq{grid-area:q;position:relative;min-width:0}
+.pb-q{width:100%;font:inherit;font-size:.85rem;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 30px 5px 9px;height:32px}
+.pb-hq kbd{position:absolute;right:8px;top:8px;font:600 .7rem/14px var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;background:var(--bg);pointer-events:none}
+.pb-q:focus+kbd,.pb-q:not(:placeholder-shown)+kbd{display:none}
+.pb-top #pb-theme{grid-area:theme}
+.pb-top .tools{grid-area:tools;display:flex;align-items:center;gap:8px}
+.pb-btn{display:inline-flex;align-items:center;gap:6px;height:32px;font:600 .85rem var(--body);border:1px solid var(--line);color:var(--fg);background:var(--surface);border-radius:6px;padding:0 12px;cursor:pointer;white-space:nowrap}
+.pb-btn svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .pb-btn.pur{border-color:var(--purple);color:var(--purple)}
 .pb-btn:disabled{opacity:.45;cursor:default}
 .pb-btn.solid{background:var(--purple);border-color:var(--purple);color:#fff}
-.pb-btn .bdg{display:inline-block;min-width:20px;margin:0 3px;padding:0 6px;border-radius:999px;background:var(--purple);color:var(--surface);font:700 .78rem/18px var(--mono);text-align:center}
+.pb-btn .bdg{display:inline-block;min-width:20px;padding:0 6px;border-radius:999px;background:var(--purple);color:var(--surface);font:700 .78rem/18px var(--mono);text-align:center}
 .pb-icon{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--fg);cursor:pointer}
 .pb-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .pb-clean{background:var(--surface);border:1px solid var(--purple);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:.88rem;display:grid;gap:8px}
@@ -67,7 +75,6 @@ html,body{margin:0;background:var(--bg)}
 
 /* filter bar */
 .pb-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px;margin-bottom:18px;background:var(--surface);border:1px solid var(--line);border-radius:8px;font-size:.85rem}
-.pb-q{flex:0 1 260px;min-width:160px;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 9px;height:32px}
 .pb-dd{position:relative}
 .pb-dd>summary{list-style:none;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid var(--line);border-radius:6px;cursor:pointer;font-weight:600;user-select:none;white-space:nowrap}
 .pb-dd>summary::-webkit-details-marker{display:none}
@@ -96,53 +103,84 @@ html,body{margin:0;background:var(--bg)}
 .pb-drawer ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .pb-drawer li{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:start;font-size:.86rem}
 .pb-drawer li small{grid-column:2;color:var(--muted);font-size:.8rem}
+.pb-drawer p{margin:0 0 10px;color:var(--muted);font-size:.8rem}
 .pb-drawer .sw{width:14px;height:14px;border-radius:3px;margin-top:3px}
 .pb-drawer .bar{width:5px;height:20px;border-radius:2px;margin:1px 4px 0}
 .pb-drawer .elb{width:16px;height:14px;border-left:2px solid var(--trunk);border-bottom:2px solid var(--trunk);border-bottom-left-radius:6px;margin:0 0 6px 4px}
 .pb-drawer .after{justify-self:start;margin-top:1px}
-.pb-drawer .ic,.pb-drawer .tag,.pb-drawer .cat{justify-self:start}
+.pb-drawer .ic,.pb-drawer .tag,.pb-drawer .cat,.pb-drawer .nx{justify-self:start}
+.pb-drawer .mix{width:56px;margin:7px 0 0}
+.pb-drawer #pb-nexts li{grid-template-columns:minmax(0,1fr);gap:3px}
+.pb-drawer #pb-nexts small{grid-column:1}
 .pb-drawer .dash{width:0;height:20px;border-left:5px dashed var(--muted);margin-left:4px}
 
-/* header counters and the group switch */
-.pb-ctr{display:flex;flex-wrap:wrap;gap:6px}
-.pb-ctr button{display:inline-flex;align-items:center;gap:6px;font:600 .8rem var(--body);border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:4px 11px;cursor:pointer;white-space:nowrap}
-.pb-ctr button i{width:9px;height:9px;border-radius:50%;display:inline-block}
-.pb-ctr button b{font:700 .9rem var(--mono)}
-.pb-ctr button[aria-pressed="true"]{border-color:var(--fg);box-shadow:inset 0 0 0 1px var(--fg)}
+/* the counters, a segmented filter, and the group and theme switches */
+.pb-ctr{grid-area:ctr;display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);min-width:max-content}
+.pb-ctr button{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;font:500 .8rem var(--body);border:0;border-right:1px solid var(--line);background:none;color:var(--muted);padding:0 10px;cursor:pointer;white-space:nowrap}
+.pb-ctr button:last-child{border-right:0}
+.pb-ctr button:focus-visible{outline-offset:-2px}
+.pb-ctr button i{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.pb-ctr button b{font:700 .88rem var(--mono);color:var(--fg)}
+.pb-ctr button[aria-pressed="true"]{background:color-mix(in srgb,var(--fg) 9%,var(--surface));color:var(--fg);box-shadow:inset 0 -2px 0 var(--fg)}
 .pb-gb{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;height:32px}
 .pb-gb button{font:600 .82rem var(--body);border:0;background:var(--surface);color:var(--muted);padding:0 10px;cursor:pointer;white-space:nowrap}
+.pb-gb button:focus-visible{outline-offset:-2px}
 .pb-gb button[aria-pressed="true"]{background:var(--fg);color:var(--surface)}
+
+/* refresh progress: a card in the corner that ticks off the steps */
+.pb-toast{position:fixed;right:16px;bottom:16px;z-index:15;width:280px;max-width:calc(100vw - 32px);background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px -8px var(--lift);padding:10px 12px;font:.82rem/1.4 var(--body)}
+.pb-toast:not([hidden]){animation:pb-up .18s ease-out}
+@keyframes pb-up{from{transform:translateY(10px);opacity:0}}
+.pb-toast .th{display:flex;align-items:center;gap:8px;font-weight:600}
+.pb-toast .steps{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px}
+.pb-toast .steps:empty{display:none}
+.pb-toast li{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.pb-toast li::before{content:"";width:8px;height:8px;border-radius:50%;border:1.5px solid var(--line);flex:0 0 auto}
+.pb-toast li.on{color:var(--fg)}
+.pb-toast li.on::before{border-color:var(--focus);background:var(--focus)}
+.pb-toast li.ok::before{border-color:var(--green);background:var(--green)}
+.spin{width:13px;height:13px;border-radius:50%;border:2px solid color-mix(in srgb,var(--focus) 25%,transparent);border-top-color:var(--focus);animation:pb-spin .8s linear infinite;flex:0 0 auto}
+.pb-toast.done .spin{animation:none;border-color:var(--green);background:var(--green)}
+@keyframes pb-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.pb-toast:not([hidden]){animation:none}.spin{animation:none;border-color:var(--focus)}}
 
 /* board */
 .groups{display:grid;gap:18px}
 .empty{color:var(--muted)}
-.band{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--trunk);border-radius:8px;padding:6px 10px;cursor:pointer;min-width:0;box-shadow:0 6px 10px -8px var(--lift)}
+.band{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:var(--fg);background:none;border:0;border-radius:6px;padding:2px 2px 2px 0;cursor:pointer;min-width:0}
 .band .car{color:var(--muted);flex:0 0 auto;width:1em;transition:transform .15s}
 .band[aria-expanded="false"] .car{transform:rotate(-90deg)}
-.band .name{font:600 1rem var(--display);white-space:nowrap}
-.band .rn{font:700 .9rem var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.band .name{font:600 1.1rem var(--display);white-space:nowrap}
+.band .rn{font:700 .95rem var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .band small{color:var(--muted);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.band .dots{display:flex;gap:10px;margin-left:auto;font:600 .78rem var(--mono);flex:0 0 auto}
-.band .dots span{display:inline-flex;align-items:center;gap:4px}
-.band .dots i{width:8px;height:8px;border-radius:50%;display:inline-block}
-.band .dots .mg{color:var(--purple)}
-.band .dots .rvn{color:var(--muted)}
-.rows{margin-left:12px;padding:6px 0 2px 10px;border-left:2px solid var(--line);display:grid;gap:6px;min-width:0}
-.pr{--c:var(--muted);position:relative;min-width:0;height:42px;display:grid;grid-template-columns:112px 168px minmax(160px,1fr) fit-content(220px) minmax(140px,240px);align-items:center;gap:12px;padding:0 12px;background:color-mix(in srgb,var(--c) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--c) 32%,var(--line));border-left:5px solid var(--c);border-radius:7px;transition:opacity .15s,transform .12s,box-shadow .12s}
+.mix{display:flex;gap:2px;width:140px;height:6px;border-radius:999px;overflow:hidden;flex:0 0 auto;background:var(--line)}
+.mix:not(:empty){background:none}
+.mix i{display:block;height:100%;min-width:3px}
+.band .mix{margin-left:auto}
+.band .tot,.band .mg,.band .rvn{font:600 .78rem var(--mono);white-space:nowrap;flex:0 0 auto}
+.band .tot,.band .rvn{color:var(--muted)}
+.band .mg{color:var(--purple)}
+.rows{margin:8px 0 0 6px;padding:2px 0 2px 12px;border-left:2px solid var(--line);display:grid;gap:6px;min-width:0}
+/* a row: number (and DRAFT) | title, up to two lines | next step
+                             | repo → base, after #N, signals | */
+.pr{--c:var(--muted);position:relative;min-width:0;display:grid;grid-template-columns:72px minmax(0,1fr) auto;grid-template-areas:"num ti nx" "num meta nx";align-items:center;column-gap:12px;row-gap:3px;padding:8px 12px;background:color-mix(in srgb,var(--c) 8%,var(--surface));border:1px solid color-mix(in srgb,var(--c) 32%,var(--line));border-left:5px solid var(--c);border-radius:7px;transition:opacity .15s,transform .12s,box-shadow .12s}
 .pr:not(.merged):hover{transform:translateY(-1px);box-shadow:0 4px 10px -2px var(--lift)}
 @media (prefers-reduced-motion:reduce){.pr{transition:opacity .15s}.pr:not(.merged):hover{transform:none}}
-.pr>*{min-width:0;overflow:hidden;white-space:nowrap}
+.pr>*{min-width:0}
 .pr.ready{--c:var(--green)}.pr.approve{--c:var(--amber)}.pr.missing{--c:var(--red)}.pr.merged{--c:var(--purple)}
 .pr.draft{border-left-style:dashed}
 .pr.dim{opacity:.38}
 .pr.sub{margin-left:28px}
 .pr.sub::before{content:"";position:absolute;left:-21px;top:-7px;width:16px;height:28px;border-left:2px solid var(--trunk);border-bottom:2px solid var(--trunk);border-bottom-left-radius:6px}
-.hd{display:flex;align-items:center;gap:6px}
-.num{font:600 .9rem var(--mono);flex:0 0 auto}
-.rp{font:600 .76rem var(--mono);color:var(--muted);text-overflow:ellipsis}
+.hd{grid-area:num;align-self:start;display:flex;flex-direction:column;align-items:flex-start;gap:3px;line-height:20px}
+.num{font:600 .9rem/20px var(--mono)}
+.ttl{grid-area:ti;font-weight:600;line-height:20px;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow-wrap:anywhere}
+.meta{grid-area:meta;display:flex;align-items:center;gap:10px;min-width:0;height:22px}
+.rp{font:600 .76rem var(--mono);color:var(--muted);flex:0 0 auto;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rp em{font-style:normal;opacity:.75}
-.ttl{font-weight:600;text-overflow:ellipsis}
-.sig{display:flex;flex-wrap:nowrap;align-items:center;gap:4px}
+.sig{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;flex:0 1 auto;min-width:0;overflow:hidden}
+.by{font-size:.8rem;color:var(--muted);white-space:nowrap;flex:0 0 auto}
+.by b{color:var(--fg);font-weight:600}
 .after{font:600 .76rem var(--mono);color:var(--muted);white-space:nowrap;flex:0 0 auto;padding-right:2px}
 .cat{font-size:.72rem;line-height:18px;border:1px solid var(--line);border-radius:999px;padding:0 7px;color:var(--muted);flex:0 0 auto;max-width:12ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .ic{display:inline-flex;flex:0 0 auto;align-items:center;gap:3px;height:22px;font:600 .78rem var(--mono);padding:0 6px;border:1px solid transparent;border-radius:6px;color:var(--k);background:color-mix(in srgb,var(--k) 13%,transparent);cursor:default;white-space:nowrap}
@@ -152,24 +190,47 @@ html,body{margin:0;background:var(--bg)}
 .ic .who{max-width:12ch;overflow:hidden;text-overflow:ellipsis}
 .tag{font-size:.66rem;font-weight:700;letter-spacing:.06em;line-height:16px;border:1px solid currentColor;color:var(--muted);border-radius:4px;padding:0 5px;flex:0 0 auto}
 .k-ok{--k:var(--green)}.k-bad{--k:var(--red)}.k-warn{--k:var(--amber)}.k-info{--k:var(--muted)}
-.next{font-size:.84rem;color:var(--muted);text-overflow:ellipsis}
-.next b{color:var(--fg);font-weight:600}
-.pr.merged,.pr.rv{height:34px}
-.pr.rv .next{font-size:.8rem}
-.pr.merged .ttl{color:var(--muted);font-weight:500}
-.pr.merged .ml{font-size:.78rem;font-weight:600;color:var(--purple)}
+/* the next step: solid when it is your move, outlined when you wait */
+.next{grid-area:nx;justify-self:end;display:flex;max-width:260px;min-width:0}
+.nx{display:inline-flex;align-items:center;gap:6px;max-width:100%;height:26px;padding:0 11px 0 8px;border-radius:999px;font:600 .8rem var(--body);border:1px solid color-mix(in srgb,var(--muted) 60%,transparent);color:var(--muted);white-space:nowrap;cursor:default}
+.nx span{overflow:hidden;text-overflow:ellipsis}
+.nx svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.nx.mine{background:var(--fg);border-color:var(--fg);color:var(--surface)}
+/* rows where you wait fade their content until hovered or focused; not on
+   touch screens, which cannot hover */
+@media (hover:hover){
+  .pr.wait>*{opacity:.5;transition:opacity .15s}
+  .pr.wait:hover>*,.pr.wait:focus-within>*{opacity:1}
+}
+.pr.merged{padding-block:5px;row-gap:1px}
+.pr.merged .ttl{color:var(--muted);font-weight:500;-webkit-line-clamp:1;line-clamp:1}
+.pr.merged .meta{height:20px}
+.pr.merged .ml{font-size:.78rem;font-weight:600;color:var(--purple);white-space:nowrap}
 .fold{font:600 .82rem var(--body);color:var(--purple);background:none;border:0;padding:2px 0;cursor:pointer;justify-self:start}
+/* narrower windows: the bar drops its secondary text to stay on one line */
+@container (max-width:1500px){.pb-btn .m{display:none}}
+@container (max-width:1240px){.pb-top .when{display:none}}
+@container (max-width:1100px){.pb-ctr .s{display:none}.pb-ctr button{padding:0 9px}}
+@container (max-width:1020px){.pb-top{grid-template-columns:auto minmax(150px,1fr) auto auto auto}.pb-btn .t,.pb-top .rf .lbl{display:none}.pb-top .rf{width:32px;padding:0;justify-content:center}.pb-top .pb-btn.pur{padding:0 8px}}
 @container (max-width:700px){
-  #app{padding:14px}.pb-q{flex:1 1 100%}
-  .pr,.pr.merged{display:flex;flex-wrap:wrap;align-items:center;height:auto;column-gap:8px;row-gap:0;padding:6px 10px}
-  .pr::after{content:"";flex:0 0 100%;order:1}
-  .hd,.rp{flex:0 0 auto;max-width:45%}
-  .ttl{flex:1 1 0}
-  .sig,.next{order:2;margin-top:4px}
-  .sig{flex:0 1 auto;max-width:calc(65% - 8px)}
-  .next{flex:1 1 0;text-align:right}
-  .band .dots{gap:6px}
+  #app{padding:14px}
+  .pb-top{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"brand tools" "q theme" "ctr ctr";gap:8px;margin:-14px -14px 12px;padding:8px 14px}
+  .pb-ctr{min-width:0}
+  .pb-ctr button{flex:1 1 auto;gap:4px;padding:0 4px;font-size:.76rem}
+  .pb-ctr button b{font-size:.82rem}
+  .pb-ctr .s{display:inline}
+  .pb-top .tools{gap:6px;justify-self:end}
+  .pb-gb button{padding:0 8px}
+  .rows{margin-left:2px;padding-left:8px}
+  .pr{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"num ti" "meta meta" "nx nx";row-gap:5px;padding:8px 10px}
+  .pr.sub{margin-left:18px}
+  .pr.sub::before{left:-14px;width:10px}
+  .hd{flex-direction:row;align-items:center;gap:6px}
+  .rp{max-width:45%}
+  .next{justify-self:start;max-width:100%}
   .band small{display:none}
+  .band .mix{width:64px}
+  .pb-toast{right:12px;bottom:12px;left:12px;width:auto;max-width:none}
 }
 </style>
 </head>
@@ -189,23 +250,34 @@ html,body{margin:0;background:var(--bg)}
   <symbol id="i-sand" viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M7 3c0 6 10 6 10 9s-10 3-10 9M17 3c0 6-10 6-10 9s10 3 10 9"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <!-- next steps -->
+  <symbol id="i-merge" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 7v10M6 7c0 4 4 5 10 5"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.5 4.5a5 5 0 0 0-5.4 6.6L3.5 16.7a2 2 0 0 0 2.8 2.8l5.6-5.6a5 5 0 0 0 6.6-5.4l-3 3-2.9-.6-.6-2.9z"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h12l-2.5 4L17 12H5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5L21.5 20h-19z"/><path d="M12 10v4.5M12 17.5h.01"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7L20 8.5"/><path d="M20 3.5v5h-5"/></symbol>
+  <symbol id="i-badge" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
 </svg>
 
 <div id="app">
-  <div class="pb-top">
-    <h1>PR Board</h1>
-    <span class="when" id="pb-when" role="status">loading…</span>
-    <div class="pb-ctr" id="pb-ctr" role="group" aria-label="Filter by colour" hidden></div>
-    <span class="sp"></span>
+  <header class="pb-top" id="pb-top">
+    <div class="brand"><h1>PR Board</h1><span class="when" id="pb-when">loading…</span></div>
+    <div class="pb-hq" id="pb-hq" role="search" aria-label="Search PRs" hidden><input class="pb-q" id="pb-q" type="search" placeholder="Search number, title, branch" aria-label="Search number, title or branch (press /)" autocomplete="off"><kbd aria-hidden="true">/</kbd></div>
+    <div class="pb-ctr" id="pb-ctr" role="group" aria-label="Filter by state" hidden></div>
     <span class="pb-gb" id="pb-theme" role="group" aria-label="Theme"><button type="button" data-t="auto" aria-pressed="true" title="Follow the system">Auto</button><button type="button" data-t="light" aria-pressed="false">Light</button><button type="button" data-t="dark" aria-pressed="false">Dark</button></span>
-    <button class="pb-icon" id="pb-legend-btn" type="button" aria-label="Legend" aria-haspopup="dialog" aria-expanded="false" aria-controls="pb-legend" title="Legend"><svg aria-hidden="true"><use href="#i-info"/></svg></button>
-    <button class="pb-btn" id="pb-refresh" type="button">Refresh</button>
-    <button class="pb-btn pur" id="pb-cleanup" type="button" disabled>Clean up</button>
-  </div>
+    <div class="tools">
+      <button class="pb-icon" id="pb-legend-btn" type="button" aria-label="Legend" aria-haspopup="dialog" aria-expanded="false" aria-controls="pb-legend" title="Legend"><svg aria-hidden="true"><use href="#i-info"/></svg></button>
+      <button class="pb-btn rf" id="pb-refresh" type="button" aria-label="Refresh" title="Collect from GitHub now"><svg aria-hidden="true"><use href="#i-refresh"/></svg><span class="lbl">Refresh</span></button>
+      <button class="pb-btn pur" id="pb-cleanup" type="button" disabled><span class="t">Clean up</span></button>
+    </div>
+  </header>
   <div class="pb-clean" id="pb-cleanbox" hidden></div>
   <div class="pb-err" id="pb-err" hidden></div>
-  <div class="pb-bar" id="pb-bar" role="search" aria-label="Filter PRs" hidden>
-    <input class="pb-q" id="pb-q" type="search" placeholder="Search number, title, branch  ( / )" aria-label="Search number, title or branch" autocomplete="off">
+  <div class="pb-bar" id="pb-bar" role="group" aria-label="Filter PRs" hidden>
     <details class="pb-dd" data-f="repo"><summary>Repo <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="Repo"></div></details>
     <details class="pb-dd" data-f="state"><summary>State <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="State"></div></details>
     <details class="pb-dd" data-f="cat"><summary>Category <span class="n" hidden></span></summary><div class="menu" role="group" aria-label="Category"></div></details>
@@ -218,6 +290,11 @@ html,body{margin:0;background:var(--bg)}
   <div class="groups" id="pb-groups"></div>
 </div>
 
+<div class="pb-toast" id="pb-toast" role="status" aria-live="polite" hidden>
+  <div class="th"><span class="spin" aria-hidden="true"></span><span class="tt">Refreshing</span></div>
+  <ol class="steps"></ol>
+</div>
+
 <div class="pb-shade" id="pb-shade" hidden></div>
 <aside class="pb-drawer" id="pb-legend" role="dialog" aria-modal="true" aria-labelledby="pb-legend-h" tabindex="-1" hidden>
   <div class="dh"><h2 id="pb-legend-h">Legend</h2><button class="pb-icon" id="pb-legend-close" type="button" aria-label="Close legend"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
@@ -225,10 +302,14 @@ html,body{margin:0;background:var(--bg)}
   <ul id="pb-colours"></ul>
   <h3>Rows</h3>
   <ul>
-    <li><span class="tag">#N</span><span>One row per open PR</span><small>Number, repository and the branch it merges into, title, signals and Next. The left bar is the colour; hover a row for its state.</small></li>
-    <li><span class="tag">REVIEW</span><span>To review</span><small>Teammates' open PRs that request your review, in a compact band at the top with their author. They are not in the counters and Clean up never touches them.</small></li>
+    <li><span class="tag">#N</span><span>One row per open PR</span><small>The number, then the title on up to two lines; under it the repository and the branch it merges into, and the signals. The next step is on the right. The left bar is the colour; hover a row for its state.</small></li>
+    <li><span class="tag">REVIEW</span><span>To review</span><small>Teammates' open PRs that request your review, in their own group at the top with their author and a Review step. They are not in the counters and Clean up never touches them.</small></li>
     <li><span class="cat">Checkout</span><span>Grouped by category</span><small>The first <code>[tag]</code> in the title; PRs without one are in Untagged, last. By repo groups them per repository instead, with the category as a pill.</small></li>
+    <li><span class="mix" id="pb-mix-sample"></span><span>The group's mix</span><small>Next to each group's name: its open PRs per colour, in counter order, then how many are open and merged. Hover the bar for the exact counts.</small></li>
   </ul>
+  <h3>Next step</h3>
+  <p>Solid when it is your move; outlined when you wait on CI, a reviewer, another PR or GitHub. Rows where you wait fade until you hover them.</p>
+  <ul id="pb-nexts"></ul>
   <h3>Signals, in row order</h3>
   <ul id="pb-icons"></ul>
   <h3>Chains</h3>
@@ -248,6 +329,8 @@ html,body{margin:0;background:var(--bg)}
     ["draft","muted","Drafts","Yours, still drafts, whatever else they need: counted apart from the colours. The row keeps its red bar, dashed, with a DRAFT tag."]
   ];
   // the header counter an open card counts in: a draft is its own, whatever its colour
+  // the counters' short labels in the command bar
+  const SHORT={ready:"ready",missing:"missing",approve:"approve",draft:"drafts"};
   const counter=c=>c.state!=="merged"&&c.draft?"draft":c.state;
   const COLOURS=STATES.filter(s=>s[0]!=="draft");
   // every signal kind in the fixed card order: [icon, colour, meaning, letters, legend sample, legend note]
@@ -260,18 +343,34 @@ html,body{margin:0;background:var(--bg)}
     req_unknown:["after","k-warn","Required PR not found","",{x:"after repo#90"}], req_done:["after","k-ok","Required PR merged","",{x:"after repo#90"}],
     threads:["chat","k-warn","Unresolved review threads","",{n:3}], stale:["sand","k-warn","Days without an update","",{n:12},"Shown after 10 days."]
   };
+  // every next-step kind (NextKind in model.go): [icon, legend sample, meaning, your move].
+  // The rows take "your move" from the server (your_move); the flag here only orders the legend.
+  const NX={
+    merge:["merge","merge","Ready: merge it",1], conflict:["mergex","merge main","Merge the base branch to resolve the conflicts",1],
+    changes:["pencil","address the requested changes","A reviewer asked for changes",1], fix:["wrench","fix failing CI","CI jobs are failing",1],
+    draft:["flag","mark ready when you want review","Still a draft",1], request:["userplus","request a reviewer","Nobody is asked to review it",1],
+    update:["sync","update from main","Behind its base branch",1], rule:["shield","check which branch rule blocks it on GitHub","Approved and green, but a branch rule blocks the merge",1],
+    required:["alert","check api#90: not found","A required PR was closed without merging, or is not found",1], approval:["badge","get an approval","Nobody has approved it yet",1],
+    review:["eye","review","A teammate asks for your review",1],
+    blocked:["link","merge #412 first","A PR it requires is still open",0], "wait-ci":["clock","wait for CI","CI jobs are running",0],
+    "wait-people":["userclock","wait for carol","Reviewers are requested",0], refresh:["refresh","refresh: GitHub is still computing mergeability","GitHub has not computed mergeability yet",0]
+  };
+  const cap=s=>s?s[0].toUpperCase()+s.slice(1):"";
   const NONE="~none";
   const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const safeURL=u=>/^https:\/\/github\.com\//.test(u||"")?u:"#";
   const $=id=>document.getElementById(id);
+  const nextChip=(kind,text,mine)=>{const d=NX[kind];return `<span class="nx${mine?" mine":""}" data-kind="${esc(kind||"")}" title="${mine?"Your move":"You wait"}: ${esc(text)}">${d?`<svg aria-hidden="true"><use href="#i-${d[0]}"/></svg>`:""}<span>${esc(cap(text))}</span></span>`};
   const ic=(k,n,t,x)=>{const d=K[k];if(!d)return"";return `<span class="ic ${d[1]}${d[3]?" lt":""}" data-k="${k}" data-name="${esc(d[2])}" title="${esc(t||d[2])}">${d[3]?`<b>${d[3]}</b>`:""}<svg aria-hidden="true"><use href="#i-${d[0]}"/></svg>${n?esc(n):""}${x?`<span class="${k==="rev"?"who":"tx"}">${esc(x)}</span>`:""}</span>`};
 
+  $("pb-mix-sample").innerHTML=`<i style="flex:2;background:var(--green)"></i><i style="flex:3;background:var(--red)"></i><i style="flex:2;background:var(--amber)"></i><i style="flex:1;background:var(--muted)"></i>`;
   $("pb-colours").innerHTML=COLOURS.map(s=>`<li><span class="bar" style="background:var(--${s[1]})"></span><span>${esc(s[2])}</span><small>${esc(s[3])}</small></li>`).join("")+
     `<li><span class="bar" style="background:var(--purple)"></span><span>Merged</span><small>Folded at the end of its group until Clean up removes it; Show merged lists them.</small></li>`;
   $("pb-icons").innerHTML=Object.entries(K).map(([k,v])=>`<li>${ic(k,v[4]&&v[4].n,"",v[4]&&v[4].x)}<span>${esc(v[2])}</span>${v[5]?`<small>${esc(v[5])}</small>`:""}</li>`).join("")+
     `<li><span class="ic k-info more" data-name="More">+2</span><span>Signals that do not fit</span><small>The tooltip lists them.</small></li>`+
     `<li><span class="tag">DRAFT</span><span>Draft</span><small>Next to the number; the row's left bar is dashed. Drafts have their own counter and State filter, not the red one.</small></li>`+
     `<li><span class="dash"></span><span>Dashed left bar</span><small>The PR is a draft.</small></li>`;
+  $("pb-nexts").innerHTML=Object.entries(NX).sort((a,b)=>b[1][3]-a[1][3]).map(([k,v])=>`<li>${nextChip(k,v[1],v[3])}<small>${esc(v[2])}${v[3]?"":"; you wait"}</small></li>`).join("");
 
   // ---- legend drawer
   const drawer=$("pb-legend"),shade=$("pb-shade"),legendBtn=$("pb-legend-btn");
@@ -306,7 +405,7 @@ html,body{margin:0;background:var(--bg)}
   // ---- "/" focuses the search, Escape leaves it
   document.addEventListener("keydown",e=>{
     const a=document.activeElement,typing=a&&(a.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
-    if(e.key==="/"&&!typing&&drawer.hidden&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!$("pb-bar").hidden){e.preventDefault();$("pb-q").focus();$("pb-q").select()}
+    if(e.key==="/"&&!typing&&drawer.hidden&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!$("pb-hq").hidden){e.preventDefault();$("pb-q").focus();$("pb-q").select()}
     else if(e.key==="Escape"&&a===$("pb-q")){e.preventDefault();$("pb-q").blur()}
   });
 
@@ -320,20 +419,24 @@ html,body{margin:0;background:var(--bg)}
     const t=c.title.replace("["+c.category+"]","").replace(/\s{2,}/g," ").trim();
     return t||c.title;
   };
-  // every open row has the same five columns (number, repo and branch,
-  // title, signals, next) and one height; merged rows are shorter
+  // every row puts the number on the left, the title first (up to two lines),
+  // the repo, branch and signals under it and the next step on the right;
+  // merged rows are shorter
   const row=(c,by,depth,chain,gid)=>{
     const open=c.state!=="merged",s=short(c.repo);
     const text=`#${c.n} ${c.title} ${c.head||""}`.toLowerCase();
     const rp=by==="repo"?`<span class="rp" title="${esc(c.repo)} → ${esc(c.base)}"><em>→ ${esc(c.base)}</em></span>`
       :`<span class="rp" title="${esc(c.repo)} → ${esc(c.base)}">${esc(s)}<em> → ${esc(c.base)}</em></span>`;
     const attrs=`data-key="${esc(c.key)}" data-parent="${esc(c.parent||"")}" data-depth="${depth||0}" data-chain="${esc(chain)}" data-group="${esc(gid)}" data-n="${esc(c.n)}" data-repo="${esc(s)}" data-state="${esc(counter(c))}" data-cat="${esc(c.category||NONE)}" data-text="${esc(text)}"`;
-    const head=`<div class="hd"><a class="num" href="${esc(safeURL(c.url))}" target="_blank" rel="noopener">#${esc(c.n)}</a>${c.draft?`<span class="tag" title="Draft">DRAFT</span>`:""}</div>${rp}<div class="ttl" title="${esc(c.title)}">${esc(shownTitle(c,by))}</div>`;
-    if(!open)return `<article class="pr merged" ${attrs} title="${esc(c.label)}">${head}<div class="sig"><span class="ml">${esc(c.label)}</span></div><div class="next"></div></article>`;
-    if(by==="review")return `<article class="pr rv ${esc(c.state)}${c.draft?" draft":""}" ${attrs} title="${esc(c.label)}">${head}<div class="sig">${(c.signals||[]).map(s=>ic(s.k,s.n,s.title,s.text)).join("")}</div><div class="next" title="Author">${c.author?`by <b>${esc(c.author)}</b>`:""}</div></article>`;
+    const head=`<div class="hd"><a class="num" href="${esc(safeURL(c.url))}" target="_blank" rel="noopener">#${esc(c.n)}</a>${c.draft?`<span class="tag" title="Draft">DRAFT</span>`:""}</div><div class="ttl" title="${esc(c.title)}">${esc(shownTitle(c,by))}</div>`;
+    if(!open)return `<article class="pr merged" ${attrs} title="${esc(c.label)}">${head}<div class="meta">${rp}<span class="ml">${esc(c.label)}</span></div></article>`;
+    const next=c.next?`<div class="next">${nextChip(c.next_kind,c.next,c.your_move)}</div>`:"";
+    const sigs=(c.signals||[]).map(s=>ic(s.k,s.n,s.title,s.text)).join("");
+    if(by==="review")return `<article class="pr rv ${esc(c.state)}${c.draft?" draft":""}" ${attrs} title="${esc(c.label)}">${head}<div class="meta">${rp}<div class="sig">${sigs}</div>${c.author?`<span class="by" title="Author">by <b>${esc(c.author)}</b></span>`:""}</div>${next}</article>`;
     const after=c.after?`<span class="after" title="${c.link==="stack"?"Stacked on":"Required first"}: ${esc(c.parent)}">${esc(c.after)}</span>`:"";
     const cat=by==="repo"&&c.category?`<span class="cat" title="Category: ${esc(c.category)}">${esc(c.category)}</span>`:"";
-    return `<article class="pr ${esc(c.state)}${c.draft?" draft":""}${depth?" sub":""}" ${attrs} title="${esc(c.label)}">${head}<div class="sig">${after}${(c.signals||[]).map(s=>ic(s.k,s.n,s.title,s.text)).join("")}${cat}</div><div class="next" title="${esc(c.next||"")}">${c.next?`<b>Next:</b> ${esc(c.next)}`:""}</div></article>`;
+    const wait=c.next&&!c.your_move?" wait":"";
+    return `<article class="pr ${esc(c.state)}${c.draft?" draft":""}${depth?" sub":""}${wait}" ${attrs} title="${esc(c.label)}">${head}<div class="meta">${rp}<div class="sig">${after}${sigs}${cat}</div></div>${next}</article>`;
   };
   // a signals row never wraps: icons that do not fit fold into a "+N" chip
   function fitSignals(root){
@@ -478,39 +581,44 @@ html,body{margin:0;background:var(--bg)}
       <p>The next refresh picks it up; press Refresh when you have saved the file.</p></div>`;
   }
   const counts=rows=>{const c={ready:0,approve:0,missing:0,draft:0};rows.forEach(r=>{const k=counter(r);if(k in c)c[k]++});return c};
-  const dots=c=>STATES.map(s=>`<span title="${esc(s[2])}"><i style="background:var(--${s[1]})"></i>${c[s[0]]}</span>`).join("");
+  // a group's status mix: one bar, a segment per counter in counter order,
+  // with the exact counts in its title and label
+  const mixLabel=c=>STATES.map(s=>`${c[s[0]]} ${s[0]==="draft"?(c.draft===1?"draft":"drafts"):s[2].toLowerCase()}`).join(", ");
+  const mixBar=c=>`<span class="mix" role="img" aria-label="${esc(mixLabel(c))}" title="${esc(mixLabel(c))}">${STATES.map(s=>c[s[0]]?`<i style="flex:${c[s[0]]};background:var(--${s[1]})"></i>`:"").join("")}</span>`;
   function groupHTML(g,by){
     const gid=by==="repo"?short(g.key):(g.key||NONE);
     const rows=g.rows||[],merged=g.merged||[];
     const title=by==="repo"
       ?`<span class="rn">${esc(g.key)}</span><small>→ ${esc(g.branch||"?")}</small>`
       :`<span class="name">${esc(g.key||"Untagged")}</span><small>${esc((g.repos||[]).map(short).join(" · "))}</small>`;
-    const mg=`<span class="mg" title="Merged in the last days, until Clean up">${merged.length} merged</span>`;
+    const mg=`<span class="tot">${rows.length} open</span><span class="mg" title="Merged in the last days, until Clean up">${merged.length} merged</span>`;
     let chain="";
     const body=rows.map(r=>{if(!r.depth)chain=r.key;return row(r,by,r.depth,chain,gid)}).join("")+
       merged.map(m=>row(m,by,0,m.key,gid)).join("")+(merged.length?`<button class="fold" type="button"></button>`:"");
-    return `<section class="group" data-gid="${esc(gid)}"><button class="band" type="button" aria-expanded="true"><span class="car" aria-hidden="true">▾</span>${title}<span class="dots">${dots(counts(rows))}${mg}</span></button>
+    return `<section class="group" data-gid="${esc(gid)}"><button class="band" type="button" aria-expanded="true"><span class="car" aria-hidden="true">▾</span>${title}${mixBar(counts(rows))}${mg}</button>
       <div class="rows${openMerged.has(by+":"+gid)?" mopen":""}">${body}</div></section>`;
   }
-  // teammates' PRs that ask for a review: one compact band above the groups
+  // teammates' PRs that ask for a review: one group above the others
   function reviewHTML(g){
     const rows=g&&g.rows||[];
     if(!rows.length)return "";
     const gid="~review",body=rows.map(r=>row(r,"review",0,r.key,gid)).join("");
-    return `<section class="group review" data-gid="${gid}"><button class="band" type="button" aria-expanded="true"><span class="car" aria-hidden="true">▾</span><span class="name">To review</span><small>${esc((g.repos||[]).map(short).join(" · "))}</small><span class="dots"><span class="rvn" title="Not counted in the colour counters">${rows.length} to review</span></span></button>
+    return `<section class="group review" data-gid="${gid}"><button class="band" type="button" aria-expanded="true"><span class="car" aria-hidden="true">▾</span><span class="name">To review</span><small>${esc((g.repos||[]).map(short).join(" · "))}</small>${mixBar(counts(rows))}<span class="rvn" title="Not counted in the colour counters">${rows.length} to review</span></button>
       <div class="rows">${body}</div></section>`;
   }
   function render(v){
     view=v;
     const t=v.refreshed&&!v.refreshed.startsWith("0001")?new Date(v.refreshed).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"never";
-    $("pb-when").classList.remove("busy");
-    $("pb-when").textContent=`${v.open} open · ${v.merged} merged · refreshed ${t}`;
+    $("pb-when").textContent=`${v.open} open · updated ${t}`;
+    $("pb-when").title=$("pb-top").querySelector("h1").title=`${v.open} open, ${v.merged} merged; last refreshed ${t}`;
     const btn=$("pb-cleanup");
-    btn.disabled=!v.merged; btn.innerHTML=v.merged?`Clean up <span class="bdg">${esc(v.merged)}</span> merged`:"Clean up";
+    btn.disabled=!v.merged; btn.innerHTML=v.merged?`<span class="t">Clean up</span><span class="bdg">${esc(v.merged)}</span><span class="t m">merged</span>`:`<span class="t">Clean up</span>`;
+    btn.setAttribute("aria-label",v.merged?`Clean up ${v.merged} merged`:"Clean up");btn.title=btn.getAttribute("aria-label");
     const err=$("pb-err"); err.hidden=!(v.errors&&v.errors.length); err.textContent=(v.errors||[]).join(" · ");
     const repos=v.repos||[],by=f.group,groups=(by==="repo"?repos:v.categories)||[];
     $("pb-bar").hidden=!!v.setup||!repos.length;
     $("pb-ctr").hidden=!!v.setup||!repos.length;
+    $("pb-hq").hidden=!!v.setup||!repos.length;
     if(v.setup){$("pb-groups").innerHTML=setupHTML(v.setup);return}
     names={};
     repos.forEach(r=>{const n=r.key.split("/").pop();names[n]=(names[n]||0)+1});
@@ -519,7 +627,7 @@ html,body{margin:0;background:var(--bg)}
     buildMenus({repos:repos.map(r=>short(r.key)).sort(),cats:[...cats].sort((a,b)=>a.localeCompare(b))});
     const c=counts(all);
     document.title=c.ready?`(${c.ready}) PR Board`:"PR Board";
-    $("pb-ctr").innerHTML=STATES.map(s=>`<button type="button" data-k="${s[0]}" aria-pressed="false" title="Show only: ${esc(s[2])}"><i style="background:var(--${s[1]})"></i><b>${c[s[0]]}</b> ${esc(s[2].toLowerCase())}</button>`).join("");
+    $("pb-ctr").innerHTML=STATES.map(s=>`<button type="button" data-k="${s[0]}" aria-pressed="false" aria-label="${c[s[0]]} ${esc(s[2].toLowerCase())}" title="Show only: ${esc(s[2])}"><i style="background:var(--${s[1]})"></i><b>${c[s[0]]}</b><span class="s">${SHORT[s[0]]}</span></button>`).join("");
     $("pb-groups").innerHTML=groups.length||v.to_review?reviewHTML(v.review)+groups.map(g=>groupHTML(g,by)).join("")+`<p class="empty" id="pb-nomatch" hidden>No PR matches these filters. <button class="pb-clear" type="button" data-clear>Clear</button></p>`
       :`<p class="empty">No PRs yet. Refresh runs on start and every 5 minutes.</p>`;
     document.querySelectorAll("#pb-groups section.group").forEach(sec=>{
@@ -541,19 +649,35 @@ html,body{margin:0;background:var(--bg)}
   }
   const load=()=>api("GET","/api/prs").then(render).catch(e=>{$("pb-err").hidden=false;$("pb-err").textContent="pr-board server unreachable: "+e.message});
   const beat=()=>api("POST","/api/heartbeat",{client:"page"}).catch(()=>{});
-  // while a refresh runs (Refresh, or the server's own every 5 minutes) the
-  // header names its step; when it ends the board reloads
-  let busy=false;
+  // while a refresh runs (Refresh, or the server's own every 5 minutes) a
+  // card in the corner lists the steps seen so far, the current one active;
+  // when it ends it says so, the board reloads and the card hides. Health only
+  // names the current step, and the 1.5 s poll can miss a short one.
+  const toast=$("pb-toast"),app=$("app");
+  let busy=false,posting=false,seen=[],hideTimer=0;
+  function drawToast(done){
+    clearTimeout(hideTimer);
+    toast.hidden=false;toast.classList.toggle("done",done);
+    toast.querySelector(".tt").textContent=done?"Updated just now":"Refreshing";
+    toast.querySelector(".steps").innerHTML=seen.map((st,i)=>`<li class="${done||i<seen.length-1?"ok":"on"}">${esc(st.replace(/…$/,""))}</li>`).join("");
+    app.classList.add("toasting");app.style.setProperty("--toast-h",toast.offsetHeight+"px");
+    if(done)hideTimer=setTimeout(()=>{toast.hidden=true;app.classList.remove("toasting");seen=[]},2600);
+  }
+  function stepSeen(step){
+    if(!busy){busy=true;if(toast.hidden||toast.classList.contains("done"))seen=[]}
+    if(step&&seen[seen.length-1]!==step)seen.push(step);
+    drawToast(false);
+  }
+  function refreshDone(reload){if(!busy)return;busy=false;drawToast(true);if(reload)load()}
   const poll=()=>{if(!document.hidden)api("GET","/api/health").then(h=>{
-    const w=$("pb-when");
-    if(h.progress){busy=true;w.classList.add("busy");w.textContent=h.progress}
-    else if(busy){busy=false;load()}
+    if(h.progress)stepSeen(h.progress);else if(!posting)refreshDone(true);
   }).catch(()=>{})};
 
   $("pb-refresh").addEventListener("click",async()=>{
-    const b=$("pb-refresh");b.disabled=true;b.textContent="Refreshing…";setTimeout(poll,150);
+    const b=$("pb-refresh"),l=b.querySelector(".lbl");b.disabled=true;l.textContent="Refreshing…";
+    posting=true;stepSeen("");setTimeout(poll,150);
     try{render(await api("POST","/api/refresh"))}catch(e){$("pb-err").hidden=false;$("pb-err").textContent=e.message}
-    b.disabled=false;b.textContent="Refresh";
+    posting=false;b.disabled=false;l.textContent="Refresh";refreshDone(false);
   });
 
   const box=$("pb-cleanbox");
@@ -587,6 +711,8 @@ html,body{margin:0;background:var(--bg)}
     }catch(e){box.innerHTML=`<b>Could not plan the cleanup</b><span class="fail">${esc(e.message)}</span>`}
   });
 
+  // focused rows scroll clear of the command bar
+  if(window.ResizeObserver)new ResizeObserver(()=>{document.documentElement.style.scrollPaddingTop=($("pb-top").offsetHeight+8)+"px"}).observe($("pb-top"));
   let fitTimer=0;
   window.addEventListener("resize",()=>{clearTimeout(fitTimer);fitTimer=setTimeout(()=>fitSignals($("pb-groups")),100)});
   if(document.fonts)document.fonts.ready.then(()=>fitSignals($("pb-groups")));

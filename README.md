@@ -5,11 +5,11 @@ needs: green to merge, yellow to approve, red when something is missing. A PR th
 another sits right under it, across repositories too, and the same counts ride along in
 your Claude Code statusline.
 
-![PR Board in a browser on a fictional organization: header counters for ready to merge, something missing, ready to approve and drafts above a filter bar; a To review band with teammates' PRs that ask for your review; then one band per category, each PR a row with a coloured left bar, its number, repository and branch, title, signal chips and the next step](docs/images/board.svg)
+![PR Board in a browser on a fictional organization: a command bar with the search and the counters ready, missing, approve and drafts above a filter bar; a To review group with teammates' PRs that ask for your review; then one group per category with a bar of its status mix, each PR a row with a coloured left bar, its number, the title, then repository, branch and signal chips, and the next step as a chip on the right, solid when it is your move and outlined on a faded row when you wait](docs/images/board.svg)
 
 ## What you are looking at
 
-![One band annotated: the category from the title, its repositories, open PRs per colour and the merged count; then each row's left bar colour, number, repository and target branch, title without its category tag, signal chips and next step, with a PR that waits on #412 indented under it. Below, the bar colours and every signal chip with its meaning](docs/images/anatomy.svg)
+![One group annotated: the category from the title, its repositories, a bar of its open PRs per colour, the open and merged counts; then each row's left bar colour, number, title without its category tag, repository and target branch, signal chips and next step, solid when it is your move, with a PR that waits on #412 indented under it, faded with an outlined step. Below, the bar colours, every signal chip and every next-step chip with its meaning](docs/images/anatomy.svg)
 
 Every value is read from the PR itself: its title, description, reviews, checks and merge
 state. [The page in detail](docs/page.md) covers the colours, signals, chains, filters and
@@ -44,9 +44,9 @@ backing up what is there.
 
 | | |
 |---|---|
-| **What to do next** | Each row says what is missing and the next step: merge, wait for a reviewer, fix failing CI, merge #412 first |
+| **What to do next** | Each row says what is missing and the next step: merge, wait for a reviewer, fix failing CI, merge #412 first. Your moves are solid chips; rows where you wait fade |
 | **Merge order in sight** | A stacked branch, or `[required:api#4021]` in a description, puts the PR under the one it waits on, in any repository |
-| **Your reviews too** | Teammates' PRs that request your review sit in their own band on top, out of your counts |
+| **Your reviews too** | Teammates' PRs that request your review sit in their own group on top, out of your counts |
 | **No token, no model** | GitHub access is your `gh` login, and every value is derived from the PR; nothing is summarised or guessed |
 | **Local only** | The server binds `127.0.0.1`, checks the `Host` header and wants its own header on every POST, so no other web page can drive it |
 | **Gone when idle** | One server per machine; by default it exits 10 minutes after the last check-in from an open page or a Claude session |

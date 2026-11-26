@@ -13,7 +13,7 @@
       └ one of yours is ready to merge
 ```
 
-The counts come by importance: the page's header counters green, red and yellow, then the To review band, then your drafts last. A draft counts once, dim, under `✎`, and not as something missing, as on the page. A count of zero is left out, and `[PRs]` on its own means nothing is open. Shape carries the state as well as colour, so it still reads in a colourblind palette, in a pipe or under `NO_COLOR`. `[PRs]` is a hyperlink (OSC 8) to the board, `http://127.0.0.1:<port>/`: the running server's port, or the configured `port` when none runs. A terminal without OSC 8 shows the label.
+The counts come by importance: the page's header counters green, red and yellow, then the To review group, then your drafts last. A draft counts once, dim, under `✎`, and not as something missing, as on the page. A count of zero is left out, and `[PRs]` on its own means nothing is open. Shape carries the state as well as colour, so it still reads in a colourblind palette, in a pipe or under `NO_COLOR`. `[PRs]` is a hyperlink (OSC 8) to the board, `http://127.0.0.1:<port>/`: the running server's port, or the configured `port` when none runs. A terminal without OSC 8 shows the label.
 
 `pr-board list` spells it out from the same store, a row per pull request, yours first and then the ones to review, worst first:
 

@@ -106,8 +106,40 @@ type Derived struct {
 	Label    string   `json:"label"`
 	Signals  []Signal `json:"signals"`
 	Next     string   `json:"next"`
+	NextKind string   `json:"next_kind,omitempty"` // what kind of step Next is: one of the Next* constants
+	YourMove bool     `json:"your_move,omitempty"` // Next is a step the user takes, not a wait
 	Category string   `json:"category"`
 	Draft    bool     `json:"draft,omitempty"` // shown as a tag and a dashed border, not a signal
+}
+
+// Next step kinds: Derived.NextKind says which kind of step Derived.Next is,
+// so the page can draw it (an icon) and tell the user's own moves from waits.
+const (
+	NextConflict   = "conflict"    // merge the base branch to resolve conflicts
+	NextChanges    = "changes"     // address the requested changes
+	NextFix        = "fix"         // fix failing CI
+	NextDraft      = "draft"       // mark the draft ready
+	NextRequest    = "request"     // request a reviewer
+	NextBlocked    = "blocked"     // wait: a required PR is still open
+	NextRequired   = "required"    // a required PR was closed without merging or is not found
+	NextMerge      = "merge"       // merge it
+	NextUpdate     = "update"      // update from the base branch
+	NextRule       = "rule"        // find the branch rule that blocks it
+	NextWaitCI     = "wait-ci"     // wait: CI is running
+	NextWaitPeople = "wait-people" // wait: reviewers are requested
+	NextRefresh    = "refresh"     // wait: GitHub is still computing mergeability
+	NextApproval   = "approval"    // get an approval
+	NextReview     = "review"      // someone else's PR that asks the user for a review
+)
+
+// YourMove reports whether a step of this kind is one the user takes; the
+// rest wait on CI, on people, on another PR or on GitHub.
+func YourMove(kind string) bool {
+	switch kind {
+	case "", NextBlocked, NextWaitCI, NextWaitPeople, NextRefresh:
+		return false
+	}
+	return true
 }
 
 // staleDays is how many days without an update make a PR stale.
@@ -162,7 +194,7 @@ func Derive(p PR, now time.Time) Derived {
 
 	add := func(k string, n int, title string) { d.Signals = append(d.Signals, Signal{K: k, N: n, Title: title}) }
 	// required PRs that still hold this one come before the merged ones
-	var reqNext string
+	var reqNext, reqKind string
 	addReq := func(r Requirement) {
 		k, state, ref := "req_unknown", "not found", shortRef(r.Repo, p.Repo, r.N)
 		switch r.State {
@@ -178,11 +210,11 @@ func Derive(p PR, now time.Time) Derived {
 			switch r.State {
 			case "MERGED":
 			case "OPEN":
-				reqNext = "merge " + ref + " first"
+				reqNext, reqKind = "merge "+ref+" first", NextBlocked
 			case "CLOSED":
-				reqNext = ref + " was closed without merging"
+				reqNext, reqKind = ref+" was closed without merging", NextRequired
 			default:
-				reqNext = "check " + ref + ": not found"
+				reqNext, reqKind = "check "+ref+": not found", NextRequired
 			}
 		}
 	}
@@ -259,33 +291,35 @@ func Derive(p PR, now time.Time) Derived {
 		d.State, d.Label = StMissing, "Something missing"
 	}
 
+	next := func(kind, text string) { d.NextKind, d.Next = kind, text }
 	switch {
 	case conflict:
-		d.Next = "merge " + p.Base
+		next(NextConflict, "merge "+p.Base)
 	case changes:
-		d.Next = "address the requested changes"
+		next(NextChanges, "address the requested changes")
 	case failing > 0:
-		d.Next = "fix failing CI"
+		next(NextFix, "fix failing CI")
 	case p.Draft:
-		d.Next = "mark ready when you want review"
+		next(NextDraft, "mark ready when you want review")
 	case p.noReviewer():
-		d.Next = "request a reviewer"
+		next(NextRequest, "request a reviewer")
 	case reqNext != "":
-		d.Next = reqNext
+		next(reqKind, reqNext)
 	case ready:
-		d.Next = "merge"
+		next(NextMerge, "merge")
 	case p.MergeState == "BEHIND":
-		d.Next = "update from " + p.Base
+		next(NextUpdate, "update from "+p.Base)
 	case p.MergeState == "BLOCKED" && approved && failing == 0 && pending == 0:
-		d.Next = "check which branch rule blocks it on GitHub"
+		next(NextRule, "check which branch rule blocks it on GitHub")
 	case pending > 0:
-		d.Next = "wait for CI"
+		next(NextWaitCI, "wait for CI")
 	case len(p.Requests) > 0:
-		d.Next = "wait for " + strings.Join(p.Requests, ", ")
+		next(NextWaitPeople, "wait for "+strings.Join(p.Requests, ", "))
 	case approved && p.Mergeable == "UNKNOWN":
-		d.Next = "refresh: GitHub is still computing mergeability"
+		next(NextRefresh, "refresh: GitHub is still computing mergeability")
 	case !approved:
-		d.Next = "get an approval"
+		next(NextApproval, "get an approval")
 	}
+	d.YourMove = YourMove(d.NextKind)
 	return d
 }

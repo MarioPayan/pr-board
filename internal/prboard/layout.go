@@ -72,7 +72,10 @@ func BuildView(s *Store, now time.Time) View {
 	for _, p := range s.PRs {
 		if p.ToReview {
 			if p.State == "OPEN" {
-				v.Review.Rows = append(v.Review.Rows, Row{Card: makeCard(p, now)})
+				// someone else's PR: the user's step is the review, whatever the author's is
+				c := makeCard(p, now)
+				c.Next, c.NextKind, c.YourMove = "review", NextReview, YourMove(NextReview)
+				v.Review.Rows = append(v.Review.Rows, Row{Card: c})
 				if !slices.Contains(v.Review.Repos, p.Repo) {
 					v.Review.Repos = append(v.Review.Repos, p.Repo)
 				}

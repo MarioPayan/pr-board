@@ -208,3 +208,47 @@ func TestDeriveCategory(t *testing.T) {
 		t.Errorf("merged cards keep the category: %q", got)
 	}
 }
+
+// Every Next has a kind, and the kind says whether the step is the user's
+// own move or a wait on CI, people, another PR or GitHub.
+func TestNextKind(t *testing.T) {
+	req := func(state string) func(*PR) {
+		return func(p *PR) { p.Requires = []Requirement{{Repo: "acme/infra", N: 7, State: state}} }
+	}
+	cases := []struct {
+		name string
+		mod  func(*PR)
+		next string
+		kind string
+		mine bool
+	}{
+		{"conflict", func(p *PR) { p.Mergeable = "CONFLICTING" }, "merge main", NextConflict, true},
+		{"changes", func(p *PR) { p.ReviewDecision = "CHANGES_REQUESTED" }, "address the requested changes", NextChanges, true},
+		{"failing CI", func(p *PR) { p.ChecksFailing = []string{"unit"} }, "fix failing CI", NextFix, true},
+		{"draft", func(p *PR) { p.Draft = true }, "mark ready when you want review", NextDraft, true},
+		{"no reviewer", func(p *PR) { p.ReviewDecision, p.Reviews = "REVIEW_REQUIRED", nil }, "request a reviewer", NextRequest, true},
+		{"required PR open", req("OPEN"), "merge infra#7 first", NextBlocked, false},
+		{"required PR closed", req("CLOSED"), "infra#7 was closed without merging", NextRequired, true},
+		{"required PR not found", req(""), "check infra#7: not found", NextRequired, true},
+		{"ready", func(p *PR) {}, "merge", NextMerge, true},
+		{"behind", func(p *PR) { p.MergeState = "BEHIND" }, "update from main", NextUpdate, true},
+		{"branch rule", func(p *PR) { p.MergeState = "BLOCKED" }, "check which branch rule blocks it on GitHub", NextRule, true},
+		{"CI running", func(p *PR) { p.ChecksPending = 2 }, "wait for CI", NextWaitCI, false},
+		{"reviewer requested", func(p *PR) {
+			p.ReviewDecision, p.Reviews, p.Requests = "REVIEW_REQUIRED", nil, []string{"carol"}
+		}, "wait for carol", NextWaitPeople, false},
+		{"mergeability unknown", func(p *PR) { p.Mergeable = "UNKNOWN" }, "refresh: GitHub is still computing mergeability", NextRefresh, false},
+		{"no approval", func(p *PR) { p.ReviewDecision, p.Reviews = "", nil }, "get an approval", NextApproval, true},
+		{"merged has no next", func(p *PR) { p.State = "MERGED" }, "", "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := base()
+			c.mod(&p)
+			d := Derive(p, now)
+			if d.Next != c.next || d.NextKind != c.kind || d.YourMove != c.mine {
+				t.Errorf("got next=%q kind=%q mine=%v, want next=%q kind=%q mine=%v", d.Next, d.NextKind, d.YourMove, c.next, c.kind, c.mine)
+			}
+		})
+	}
+}

@@ -224,6 +224,12 @@ func TestReviewGroup(t *testing.T) {
 	if r := v.Review.Rows[0]; r.Parent != "" || r.Depth != 0 || r.Author != "bob" {
 		t.Errorf("review row %+v", r)
 	}
+	// a PR to review is the user's move, whatever its author has to do
+	for _, r := range v.Review.Rows {
+		if r.Next != "review" || r.NextKind != NextReview || !r.YourMove {
+			t.Errorf("review row %s: next=%q kind=%q mine=%v", r.Key, r.Next, r.NextKind, r.YourMove)
+		}
+	}
 	if got := groupsString(v.Categories) + " / " + groupsString(v.Repos); got != ": #1 / acme/app: #1" {
 		t.Errorf("groups %q: reviews must stay out", got)
 	}

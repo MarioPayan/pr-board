@@ -67,7 +67,7 @@ try {
     if (before) await before(page);
     const file = path.join(out, name);
     await page.screenshot({ path: file, fullPage });
-    // every row of one kind has one height
+    // row heights per kind: open rows take one or two title lines
     const heights = await page.$$eval("[data-key]", els => {
       const h = {};
       for (const e of els) {
@@ -85,6 +85,12 @@ try {
   await shot("pr-board-repo.png", "#group=repo", "light", true);
   await shot("pr-board-filtered.png", "#repo=web,design-system&state=missing,approve", "light", false);
   await shot("pr-board-legend.png", "", "light", false, async p => { await p.click("#pb-legend-btn"); await p.waitForTimeout(300); });
+  // mid-refresh: the demo walks the real steps on every refresh after the first
+  await shot("pr-board-refresh.png", "", "light", false, async p => {
+    await p.click("#pb-refresh");
+    await p.waitForSelector("#pb-toast:not([hidden]) li");
+    await p.waitForTimeout(800);
+  });
 } finally {
   if (browser) await browser.close();
   server.kill("SIGINT");

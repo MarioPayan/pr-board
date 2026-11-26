@@ -57,21 +57,36 @@ def page_rules():
         kinds[k] = {"icon": s[0], "cls": s[1], "name": s[2], "letters": s[3] if len(s) > 3 else "",
                     "n": n.group(1) if n else "", "x": x.group(1) if x else ""}
     states = re.findall(r'\["(ready|missing|approve|draft)","(\w+)","([^"]+)"', HTML)
+    short = dict(re.findall(r'(ready|missing|approve|draft):"(\w+)"', re.search(r"const SHORT=\{(.*?)\};", HTML).group(1)))
+    # the next-step kinds: [icon, legend sample, meaning, your move]
+    block = re.search(r"const NX=\{(.*?)\n  \};", HTML, re.S).group(1)
+    nexts = {k.strip('"'): {"icon": i, "sample": x, "name": m, "mine": f == "1"}
+             for k, i, x, m, f in re.findall(r'("?[\w-]+"?):\["(\w+)","([^"]*)","([^"]*)",(\d)\]', block)}
     # the layout below is these rules; refuse to draw if the page changed them
     for rule in (
-        r"\.pr\{[^}]*height:42px;display:grid;grid-template-columns:112px 168px minmax\(160px,1fr\) fit-content\(220px\) minmax\(140px,240px\);align-items:center;gap:12px;padding:0 12px;",
-        r"\.pr\.merged,\.pr\.rv\{height:34px\}",
+        r"\.pb-top\{position:sticky;top:0;[^}]*grid-template-columns:auto minmax\(200px,1fr\) auto auto auto;[^}]*gap:12px;margin:-20px -20px 14px;padding:10px 20px;",
+        r"\.pr\{[^}]*display:grid;grid-template-columns:72px minmax\(0,1fr\) auto;grid-template-areas:\"num ti nx\" \"num meta nx\";align-items:center;column-gap:12px;row-gap:3px;padding:8px 12px;",
+        r"\.ttl\{grid-area:ti;font-weight:600;line-height:20px;[^}]*-webkit-line-clamp:2;",
+        r"\.meta\{grid-area:meta;display:flex;align-items:center;gap:10px;min-width:0;height:22px\}",
+        r"\.rp\{font:600 \.76rem var\(--mono\);color:var\(--muted\);flex:0 0 auto;max-width:42%;",
+        r"\.next\{grid-area:nx;justify-self:end;display:flex;max-width:260px;",
+        r"\.nx\{display:inline-flex;align-items:center;gap:6px;max-width:100%;height:26px;padding:0 11px 0 8px;border-radius:999px;font:600 \.8rem var\(--body\);",
+        r"\.pr\.wait>\*\{opacity:\.5;",
         r"\.pr\.sub\{margin-left:28px\}",
-        r"\.rows\{margin-left:12px;padding:6px 0 2px 10px;border-left:2px solid var\(--line\);display:grid;gap:6px",
+        r"\.rows\{margin:8px 0 0 6px;padding:2px 0 2px 12px;border-left:2px solid var\(--line\);display:grid;gap:6px",
+        r"\.band\{display:flex;align-items:center;gap:10px;[^}]*background:none;border:0;[^}]*padding:2px 2px 2px 0;",
+        r"\.mix\{display:flex;gap:2px;width:140px;height:6px;",
         r"\.ic\{display:inline-flex;flex:0 0 auto;align-items:center;gap:3px;height:22px;font:600 \.78rem var\(--mono\);padding:0 6px;",
         r"\.groups\{display:grid;gap:18px\}",
     ):
         if not re.search(rule, HTML):
             raise SystemExit(f"index.html no longer matches the layout this script draws:\n  {rule}")
-    return tok, icons, kinds, states
+    if not nexts or len(short) != 4:
+        raise SystemExit("index.html: the NX or SHORT table no longer parses")
+    return tok, icons, kinds, states, short, nexts
 
 
-TOK, ICONS, K, STATES = page_rules()
+TOK, ICONS, K, STATES, SHORT, NX = page_rules()
 KCOL = {"k-ok": TOK["green"], "k-bad": TOK["red"], "k-warn": TOK["amber"], "k-info": TOK["muted"]}
 BAR = {"ready": TOK["green"], "approve": TOK["amber"], "missing": TOK["red"], "merged": TOK["purple"]}
 
@@ -238,17 +253,17 @@ def draw_chip(s, x, mid, sig, under):
     return w
 
 
-def fit_signals(card):
-    """The signals that show, folding the overflow into "+N" as fitSignals() does."""
+def fit_signals(card, avail):
+    """The signals that show in avail px, folding the overflow into "+N" as fitSignals() does."""
     after = card.get("after", "")
     base = (mw(after, 10.64) + 2 + 4) if after else 0
     sigs = list(card.get("signals") or [])
     width = lambda ss: base + sum(chip_width(x) for x in ss) + 4 * max(len(ss) - 1, 0)  # noqa: E731
-    if width(sigs) <= 220:
+    if width(sigs) <= avail:
         return sigs, width(sigs)
     for hide in range(1, len(sigs) + 1):
         shown = sigs[:-hide] + [{"k": "more", "n": f"+{hide}"}]
-        if width(shown) <= 220:
+        if width(shown) <= avail:
             return shown, width(shown)
     raise SystemExit(f"signals of {card['key']} do not fit")
 
@@ -263,64 +278,116 @@ def shown_title(card, by):
     return re.sub(r"\s{2,}", " ", card["title"].replace("[" + card["category"] + "]", "")).strip() or card["title"]
 
 
+def wrap2(text, width, measure):
+    """The title on up to two lines, as -webkit-line-clamp:2 cuts it."""
+    if measure(text) <= width:
+        return [text]
+    words, first = text.split(" "), ""
+    while words and measure((first + " " + words[0]).strip()) <= width:
+        first = (first + " " + words.pop(0)).strip()
+    if not first:  # one long word: break it, as overflow-wrap:anywhere does
+        first = cut(text, width, measure).rstrip("…")
+        words = [text[len(first):]]
+    return [first, cut(" ".join(words), width, measure)]
+
+
+NEXT_SIZE = 0.8 * 14   # .nx font size, in px
+
+
+def cap(t):
+    return t[:1].upper() + t[1:]
+
+
+def next_width(text):
+    """.nx: border, padding 8, icon 15, gap 6, text, padding 11, border; at most .next's 260px."""
+    return min(260, 1 + 8 + 15 + 6 + tw(cap(text), NEXT_SIZE, 600) + 11 + 1)
+
+
+def draw_next(s, right, mid, kind, text, mine, under):
+    """The next-step chip, right-aligned at right; returns its x span."""
+    w = next_width(text)
+    x = right - w
+    nx = NX.get(kind)
+    if mine:
+        fill, edge, ink = TOK["fg"], TOK["fg"], TOK["surface"]
+    else:
+        fill, edge, ink = under, mix(TOK["muted"], under, .6), TOK["muted"]
+    s.rect(x + .5, mid - 12.5, w - 1, 25, 12.5, fill, edge)
+    cx = x + 1 + 8
+    if nx:
+        s.icon(nx["icon"], cx, mid - 7.5, 15, ink)
+        cx += 15 + 6
+    s.text(cx, mid + 4, cut(cap(text), x + w - 12 - cx + .5, lambda v: tw(v, NEXT_SIZE, 600)), NEXT_SIZE, ink, weight=600)
+    return (x, x + w)
+
+
+def row_height(lines):
+    """.pr: border 1, padding 8, the title's lines of 20px, row gap 3, meta 22, padding 8, border 1."""
+    return 1 + 8 + 20 * lines + 3 + 22 + 8 + 1
+
+
 def draw_row(s, x, y, w, card, by, depth=0):
     """One .pr row; returns its geometry for callouts."""
     if card.get("draft"):
         raise SystemExit(f"{card['key']} is a draft; this script does not draw the DRAFT tag")
     review = by == "review"
-    h = 34 if review else 42
     if depth:
-        # .pr.sub::before, the elbow from the row above
-        ex = x + 28 - 21 + 1
-        s.add(f'<path d="M{ex:.1f} {y - 7:.1f}V{y + 14:.1f}q0 6 6 6H{ex + 15:.1f}" fill="none" stroke="{TOK["trunk"]}" stroke-width="2"/>')
         x, w = x + 28, w - 28
     col = BAR[card["state"]]
     under = mix(col, TOK["surface"], .08)
-    s.boxed(x, y, w, h, 7, under, mix(col, TOK["line"], .32), 5, col)
-    mid = y + h / 2
-    c1 = x + 5 + 12
-    c2 = c1 + 112 + 12
-    c3 = c2 + 168 + 12
-    nw = 240
-    nx = x + w - 1 - 12 - nw
-    sigs, sw = fit_signals(card) if not review else (card.get("signals") or [], None)
-    if review:
-        sw = sum(chip_width(x_) for x_ in sigs) + 4 * (len(sigs) - 1)
-    sx = nx - 12 - sw
-    title_w = sx - 12 - c3
-    if title_w < 160:
+    left = x + 5 + 12                              # the number column, 72px
+    right = x + w - 1 - 12
+    nw = next_width(card["next"]) if card.get("next") else 0
+    c2 = left + 72 + 12                            # title and meta
+    c2_end = right - (nw + 12 if nw else 0)
+    if c2_end - c2 < 300:
         raise SystemExit("the image is too narrow for the row grid")
+    lines = wrap2(shown_title(card, by), c2_end - c2, lambda v: tw(v, 14, 600))
+    h = row_height(len(lines))
+    if depth:
+        # .pr.sub::before, the elbow from the row above
+        ex = x - 21 + 1
+        s.add(f'<path d="M{ex:.1f} {y - 7:.1f}V{y + 14:.1f}q0 6 6 6H{ex + 15:.1f}" fill="none" stroke="{TOK["trunk"]}" stroke-width="2"/>')
+    s.boxed(x, y, w, h, 7, under, mix(col, TOK["line"], .32), 5, col)
+    wait = not review and card.get("next") and not card.get("your_move")
+    if wait:   # .pr.wait>*: the content fades, the card does not
+        s.add('<g opacity="0.5">')
+    top = y + 1 + 8
     num = f"#{card['n']}"
-    s.mono(c1, mid + 4.4, num, 12.6, TOK["fg"], 600)
-    s.line(c1, mid + 6.5, c1 + mw(num, 12.6), mid + 6.5, TOK["fg"])
-    s.mono(c2, mid + 3.7, short(card["repo"]), 10.64, TOK["muted"], 600)
-    s.mono(c2 + mw(short(card["repo"]), 10.64), mid + 3.7, " → " + card["base"], 10.64, TOK["muted"], 600, opacity=.75)
-    t = cut(shown_title(card, by), title_w, lambda v: tw(v, 14, 600))
-    s.text(c3, mid + 4.9, t, 14, TOK["fg"], weight=600)
+    s.mono(left, top + 14.6, num, 12.6, TOK["fg"], 600)
+    s.line(left, top + 16.7, left + mw(num, 12.6), top + 16.7, TOK["fg"])
+    for i, ln in enumerate(lines):
+        s.text(c2, top + 14.8 + 20 * i, ln, 14, TOK["fg"], weight=600)
+    title = (c2, c2 + max(tw(ln, 14, 600) for ln in lines))
+    meta_mid = top + 20 * len(lines) + 3 + 11
+    rp_name, rp_base = short(card["repo"]), " → " + card["base"]
+    rp_w = mw(rp_name + rp_base, 10.64)
+    if rp_w > (c2_end - c2) * .42:
+        raise SystemExit(f"{card['key']}: the branch would be cut; this script does not cut it")
+    s.mono(c2, meta_mid + 3.7, rp_name, 10.64, TOK["muted"], 600)
+    s.mono(c2 + mw(rp_name, 10.64), meta_mid + 3.7, rp_base, 10.64, TOK["muted"], 600, opacity=.75)
+    sx = c2 + rp_w + 10
+    by_w = (10 + tw("by " + card.get("author", ""), 11.2, 600)) if review else 0
+    sigs, sw = fit_signals(card, c2_end - sx - by_w)
     cx = sx
     if card.get("after") and not review:
-        s.mono(cx, mid + 3.7, card["after"], 10.64, TOK["muted"], 600)
+        s.mono(cx, meta_mid + 3.7, card["after"], 10.64, TOK["muted"], 600)
         cx += mw(card["after"], 10.64) + 2 + 4
-    spans = {}
+    chips = [cx, cx]
     for sig in sigs:
-        cw = draw_chip(s, cx, mid, sig, under)
-        spans.setdefault("chips", [cx, cx + cw])[1] = cx + cw
+        cw = draw_chip(s, cx, meta_mid, sig, under)
+        chips[1] = cx + cw
         cx += cw + 4
     if review:
-        size, lead, bold = 11.2, "by ", card.get("author", "")
-    else:
-        size, lead, bold = 11.76, "", "Next:"
-    if review:
-        s.text(nx, mid + 4, lead, size, TOK["muted"])
-        s.text(nx + tw(lead, size), mid + 4, bold, size, TOK["fg"], weight=600)
-    else:
-        s.text(nx, mid + 4, bold, size, TOK["fg"], weight=600)
-        rest = cut(card["next"], nw - tw(bold + " ", size, 600), lambda v: tw(v, size))
-        s.text(nx + tw(bold + " ", size, 600), mid + 4, rest, size, TOK["muted"])
-    return {"x": x, "y": y, "h": h, "mid": mid, "num": (c1, c1 + mw(num, 12.6)),
-            "repo": (c2, c2 + mw(short(card["repo"]) + " → " + card["base"], 10.64)),
-            "title": (c3, c3 + min(title_w, tw(t, 14, 600))), "after": (sx, sx + mw(card.get("after", ""), 10.64)),
-            "chips": tuple(spans.get("chips", (sx, sx))), "next": (nx, nx + tw("Next: " + card.get("next", ""), size)),
+        bx = sx + sw + 10
+        s.text(bx, meta_mid + 4, "by ", 11.2, TOK["muted"])
+        s.text(bx + tw("by ", 11.2), meta_mid + 4, card.get("author", ""), 11.2, TOK["fg"], weight=600)
+    nspan = draw_next(s, right, y + h / 2, card.get("next_kind", ""), card["next"], card.get("your_move"), under) if nw else (right, right)
+    if wait:
+        s.add("</g>")
+    return {"x": x, "y": y, "h": h, "mid": y + h / 2, "meta": meta_mid, "top": top + 10,
+            "num": (left, left + mw(num, 12.6)), "repo": (c2, c2 + rp_w), "title": title,
+            "after": (sx, sx + mw(card.get("after", ""), 10.64)), "chips": tuple(chips), "next": nspan,
             "elbow": x - 21 + 1 if depth else None}
 
 
@@ -331,83 +398,69 @@ def counts(rows):
     return c
 
 
-BAND_H = 37
+BAND_H = 26   # .band: padding 2, the 1.1rem name at line-height 1.45
+
+
+def draw_mix(s, x, mid, width, c):
+    """.mix: one segment per counter, in counter order, 2px apart."""
+    parts = [(TOK[colour], c[key]) for key, colour, _ in STATES if c[key]]
+    total = sum(n for _, n in parts)
+    s.clips += 1
+    cid = f"c{s.clips}"
+    s.add(f'<clipPath id="{cid}"><rect x="{x:.1f}" y="{mid - 3:.1f}" width="{width}" height="6" rx="3"/></clipPath><g clip-path="url(#{cid})">')
+    free = width - 2 * (len(parts) - 1)
+    for colour, n in parts:
+        sw = free * n / total
+        s.rect(x, mid - 3, sw, 6, 0, colour)
+        x += sw + 2
+    s.add("</g>")
 
 
 def draw_band(s, x, y, w, group, review=False):
-    """The band button; returns the x spans of its parts."""
-    s.boxed(x, y, w, BAND_H, 8, TOK["surface"], TOK["line"], 4, TOK["trunk"])
+    """The plain group heading; returns the x spans of its parts."""
     mid = y + BAND_H / 2
-    cx = x + 4 + 10
+    cx = x
     s.text(cx + 7, mid + 4.5, "▾", 14, TOK["muted"], anchor="middle")
     cx += 14 + 10
     name = "To review" if review else (group["key"] or "Untagged")
-    s.text(cx, mid + 5.5, name, 16, TOK["fg"], DISPLAY, 600)
-    spans = {"name": (cx, cx + tw(name, 16, 600))}
+    s.text(cx, mid + 5.5, name, 15.4, TOK["fg"], DISPLAY, 600)
+    spans = {"name": (cx, cx + tw(name, 15.4, 600))}
     cx = spans["name"][1] + 10
     repos = " · ".join(short(r) for r in group.get("repos") or [])
     s.text(cx, mid + 4, repos, 10.92, TOK["muted"])
     spans["repos"] = (cx, cx + tw(repos, 10.92))
-    right = x + w - 1 - 10
+    right = x + w - 2
     if review:
-        t = f"{len(group['rows'])} to review"
-        s.mono(right - mw(t, 10.92), mid + 4, t, 10.92, TOK["muted"], 600)
-        return spans
-    mg = f"{len(group.get('merged') or [])} merged"
-    s.mono(right - mw(mg, 10.92), mid + 4, mg, 10.92, TOK["purple"], 600)
-    spans["merged"] = (right - mw(mg, 10.92), right)
-    c = counts(group["rows"])
-    dots = [(TOK[colour], str(c[key])) for key, colour, _ in STATES]
-    widths = [8 + 4 + mw(n, 10.92) for _, n in dots]
-    dx = right - mw(mg, 10.92) - 10 - sum(widths) - 10 * (len(dots) - 1)
-    spans["dots"] = (dx, right - mw(mg, 10.92) - 10)
-    for (colour, n), dw in zip(dots, widths):
-        s.add(f'<circle cx="{dx + 4:.1f}" cy="{mid:.1f}" r="4" fill="{colour}"/>')
-        s.mono(dx + 12, mid + 4, n, 10.92, TOK["fg"], 600)
-        dx += dw + 10
+        tail = [(f"{len(group['rows'])} to review", TOK["muted"], "count")]
+    else:
+        tail = [(f"{len(group['rows'])} open", TOK["muted"], "total"),
+                (f"{len(group.get('merged') or [])} merged", TOK["purple"], "merged")]
+    tx = right - sum(mw(t, 10.92) for t, _, _ in tail) - 10 * (len(tail) - 1)
+    spans["mix"] = (tx - 10 - 140, tx - 10)
+    draw_mix(s, spans["mix"][0], mid, 140, counts(group["rows"]))
+    for t, colour, key in tail:
+        s.mono(tx, mid + 4, t, 10.92, colour, 600)
+        spans[key] = (tx, tx + mw(t, 10.92))
+        tx += mw(t, 10.92) + 10
     return spans
 
 
 def draw_group(s, x, y, w, group, by):
-    """A band and its open rows; returns (bottom y, band spans, row geometries)."""
+    """A heading and its open rows; returns (bottom y, heading spans, row geometries)."""
     spans = draw_band(s, x, y, w, group, review=by == "review")
-    ry = y + BAND_H + 6
+    ry = y + BAND_H + 8 + 2
     rows = []
     for r in group["rows"]:
-        g = draw_row(s, x + 24, ry, w - 24, r, by, r.get("depth", 0))
+        g = draw_row(s, x + 20, ry, w - 20, r, by, r.get("depth", 0))
         rows.append(g)
         ry += g["h"] + 6
-    s.line(x + 13, y + BAND_H, x + 13, ry - 6 + 2, TOK["line"], 2)
+    s.line(x + 7, y + BAND_H + 8, x + 7, ry - 6 + 2, TOK["line"], 2)
     return ry - 6 + 2, spans, rows
 
 
 # ── image 1: the board ───────────────────────────────────────────────────────
-def flex_wrap(items, x, width, gap):
-    """Lay items out like flex-wrap: [(w, h, draw, grow)], one line at a time."""
-    lines, cur, used = [], [], 0
-    for it in items:
-        need = it[0] + (gap if cur else 0)
-        if cur and used + need > width:
-            lines.append(cur)
-            cur, used = [], 0
-            need = it[0]
-        cur.append(it)
-        used += need
-    lines.append(cur)
-    placed = []
-    for ln in lines:
-        free = width - sum(i[0] for i in ln) - gap * (len(ln) - 1)
-        grow = [i for i in ln if i[3]]
-        cx = x
-        for i in ln:
-            placed.append((cx, i))
-            cx += i[0] + (free / len(grow) if i in grow else 0) + gap
-        placed.append(None)
-    return placed
-
-
 def board_svg(view):
-    W, H = 1100, 820
+    W, H = 1480, 1000   # the page at 1440px wide: the summary line shows, "merged" on Clean up does not
     s = Svg()
     s.rect(0, 0, W, H, 9, TOK["bg"])
     # the browser around it, plainly drawn
@@ -417,80 +470,73 @@ def board_svg(view):
     s.rect(80, 9, 260, 22, 11, TOK["surface"])
     s.text(94, 24.5, "127.0.0.1:7878", 11.5, TOK["muted"])
     s.line(0, 40, W, 40, TOK["line"])
-    s.add('<clipPath id="page"><rect x="0" y="41" width="1100" height="779"/></clipPath><g clip-path="url(#page)">')
+    s.add(f'<clipPath id="page"><rect x="0" y="41" width="{W}" height="{H - 41}"/></clipPath><g clip-path="url(#page)">')
 
     X, CW = 20, W - 40
-    y = 41 + 20
-    # header: title, counters, theme, legend, refresh, clean up
+    # the command bar: a 53px strip across the page, its items 32px high
+    top, m = 41, 41 + 10 + 16
+    s.rect(0, top, W, 52, 0, TOK["bg"])
+    s.line(0, top + 52.5, W, top + 52.5, TOK["line"])
     c = counts([r for g in view["repos"] for r in g["rows"]])
-    items = []
-    items.append((tw("PR Board", 24, 600), 35, lambda x, m: s.text(x, m + 8, "PR Board", 24, TOK["fg"], DISPLAY, 600), False))
-    when = f"{view['open']} open · {view['merged']} merged"
-    items.append((tw(when, 11.9), 18, lambda x, m: s.text(x, m + 4, when, 11.9, TOK["muted"]), False))
-    pills = []
-    for key, colour, name in STATES:
-        label = name.lower()
-        pw = 2 + 11 + 9 + 6 + mw(str(c[key]), 12.6) + 6 + tw(label, 11.2, 600) + 11
-        pills.append((pw, key, colour, label))
-    ctr_w = sum(p[0] for p in pills) + 6 * (len(pills) - 1)
-
-    def draw_ctr(x, m):
-        for pw, key, colour, label in pills:
-            s.rect(x + .5, m - 13.5, pw - 1, 27, 13.5, TOK["surface"], TOK["line"])
-            s.add(f'<circle cx="{x + 13 + 4.5:.1f}" cy="{m:.1f}" r="4.5" fill="{TOK[colour]}"/>')
-            n = str(c[key])
-            s.mono(x + 28, m + 4.4, n, 12.6, TOK["fg"], 700)
-            lx = x + 28 + mw(n, 12.6) + 6
-            s.text(lx, m + 4, label, 11.2, TOK["fg"], weight=600, length=pw - (lx - x) - 13)
-            x += pw + 6
-    items.append((ctr_w, 28, draw_ctr, False))
-    items.append((0, 0, lambda x, m: None, True))
+    when = f"{view['open']} open · updated 12:48 PM"
+    brand_w = tw("PR Board", 16.1, 600) + 10 + tw(when, 11.48)
+    segs = [(key, colour, str(c[key]), SHORT[key]) for key, colour, _ in STATES]
+    seg_w = [10 + 8 + 6 + mw(n, 12.32) + 6 + tw(lbl, 11.2, 500) + 10 for _, _, n, lbl in segs]
+    ctr_w = sum(seg_w) + (len(segs) - 1) + 2
     theme = [("Auto", True), ("Light", False), ("Dark", False)]
     th_w = sum(20 + tw(t, 11.48, 600) for t, _ in theme) + 2
-
-    def draw_theme(x, m):
-        s.rect(x + .5, m - 15.5, th_w - 1, 31, 6, TOK["surface"], TOK["line"])
-        cx = x + 1
-        for t, on in theme:
-            bw = 20 + tw(t, 11.48, 600)
-            if on:
-                s.rect(cx, m - 15, bw, 30, 0, TOK["fg"])
-            s.text(cx + 10, m + 4, t, 11.48, TOK["surface"] if on else TOK["muted"], weight=600, length=bw - 20)
-            cx += bw
-    items.append((th_w, 32, draw_theme, False))
-
-    def draw_info(x, m):
-        s.rect(x + .5, m - 15.5, 31, 31, 6, TOK["surface"], TOK["line"])
-        s.icon("info", x + 7, m - 9, 18, TOK["fg"], 2)
-    items.append((32, 32, draw_info, False))
-    rw = 24 + 2 + tw("Refresh", 11.9, 600)
-
-    def draw_refresh(x, m):
-        s.rect(x + .5, m - 15, rw - 1, 30, 6, TOK["surface"], TOK["line"])
-        s.text(x + 13, m + 4.2, "Refresh", 11.9, TOK["fg"], weight=600, length=rw - 26)
-    items.append((rw, 31, draw_refresh, False))
+    rf_w = 1 + 12 + 15 + 6 + tw("Refresh", 11.9, 600) + 12 + 1
     badge = str(view["merged"])
     bw = max(20, 12 + mw(badge, 10.92))
-    cu_w = 26 + tw("Clean up", 11.9, 600) + 4 + 3 + bw + 3 + 4 + tw("merged", 11.9, 600)
-
-    def draw_cleanup(x, m):
-        s.rect(x + .5, m - 15, cu_w - 1, 30, 6, TOK["surface"], TOK["purple"])
-        s.text(x + 13, m + 4.2, "Clean up", 11.9, TOK["purple"], weight=600)
-        bx = x + 13 + tw("Clean up", 11.9, 600) + 4 + 3
-        s.rect(bx, m - 9, bw, 18, 9, TOK["purple"])
-        s.mono(bx + (bw - mw(badge, 10.92)) / 2, m + 4, badge, 10.92, TOK["surface"], 700)
-        s.text(bx + bw + 3 + 4, m + 4.2, "merged", 11.9, TOK["purple"], weight=600)
-    items.append((cu_w, 31, draw_cleanup, False))
-    y = place_lines(flex_wrap(items, X, CW, 16), y, 10) + 12
+    cu_w = 1 + 12 + tw("Clean up", 11.9, 600) + 6 + bw + 12 + 1   # "merged" hides under 1500px
+    tools_w = 32 + 8 + rf_w + 8 + cu_w
+    q_w = CW - brand_w - ctr_w - th_w - tools_w - 4 * 12
+    if q_w < 200:
+        raise SystemExit("the command bar does not fit the image")
+    x = X
+    s.text(x, m + 5.5, "PR Board", 16.1, TOK["fg"], DISPLAY, 600)
+    s.text(x + tw("PR Board", 16.1, 600) + 10, m + 4, when, 11.48, TOK["muted"])
+    x += brand_w + 12
+    s.rect(x + .5, m - 15.5, q_w - 1, 31, 6, TOK["surface"], TOK["line"])
+    s.text(x + 10, m + 4, "Search number, title, branch", 11.9, TOK["muted"])
+    s.rect(x + q_w - 8 - 17 + .5, m - 7.5, 16, 15, 4, TOK["bg"], TOK["line"])
+    s.mono(x + q_w - 8 - 17 + 5, m + 3.5, "/", 9.8, TOK["muted"], 600)
+    x += q_w + 12
+    s.rect(x + .5, m - 15.5, ctr_w - 1, 31, 8, TOK["surface"], TOK["line"])
+    sx = x + 1
+    for (key, colour, n, lbl), sw_ in zip(segs, seg_w):
+        if sx > x + 1:
+            s.line(sx - .5, m - 15, sx - .5, m + 15, TOK["line"])
+        s.add(f'<circle cx="{sx + 10 + 4:.1f}" cy="{m:.1f}" r="4" fill="{TOK[colour]}"/>')
+        s.mono(sx + 10 + 8 + 6, m + 4.4, n, 12.32, TOK["fg"], 700)
+        s.text(sx + 10 + 8 + 6 + mw(n, 12.32) + 6, m + 4, lbl, 11.2, TOK["muted"], weight=500)
+        sx += sw_ + 1
+    x += ctr_w + 12
+    s.rect(x + .5, m - 15.5, th_w - 1, 31, 6, TOK["surface"], TOK["line"])
+    cx = x + 1
+    for t, on in theme:
+        bw_ = 20 + tw(t, 11.48, 600)
+        if on:
+            s.rect(cx, m - 15, bw_, 30, 0, TOK["fg"])
+        s.text(cx + 10, m + 4, t, 11.48, TOK["surface"] if on else TOK["muted"], weight=600, length=bw_ - 20)
+        cx += bw_
+    x += th_w + 12
+    s.rect(x + .5, m - 15.5, 31, 31, 6, TOK["surface"], TOK["line"])
+    s.icon("info", x + 7, m - 9, 18, TOK["fg"], 2)
+    x += 32 + 8
+    s.rect(x + .5, m - 15.5, rf_w - 1, 31, 6, TOK["surface"], TOK["line"])
+    s.icon("refresh", x + 13, m - 7.5, 15, TOK["fg"])
+    s.text(x + 13 + 15 + 6, m + 4.2, "Refresh", 11.9, TOK["fg"], weight=600)
+    x += rf_w + 8
+    s.rect(x + .5, m - 15.5, cu_w - 1, 31, 6, TOK["surface"], TOK["purple"])
+    s.text(x + 13, m + 4.2, "Clean up", 11.9, TOK["purple"], weight=600)
+    bx = x + 13 + tw("Clean up", 11.9, 600) + 6
+    s.rect(bx, m - 9, bw, 18, 9, TOK["purple"])
+    s.mono(bx + (bw - mw(badge, 10.92)) / 2, m + 4, badge, 10.92, TOK["surface"], 700)
+    y = top + 53 + 14
 
     # filter bar
     bar_items = []
-    ph = "Search number, title, branch  ( / )"
-
-    def draw_q(x, m):
-        s.rect(x + .5, m - 15.5, 259, 31, 6, TOK["bg"], TOK["line"])
-        s.text(x + 10, m + 4, ph, 11.9, TOK["muted"])
-    bar_items.append((260, 32, draw_q, False))
     for dd in ("Repo", "State", "Category"):
         dw = 20 + tw(dd, 11.9, 600) + 6 + 6 + 2
 
@@ -526,7 +572,7 @@ def board_svg(view):
     place_lines(flex_wrap(bar_items, X + 9, CW - 18, 8), y + 9, 8)
     y += 48 + 18
 
-    # the bands: to review, then the categories in order, until the window ends
+    # the groups: to review, then the categories in order, until the window ends
     y, _, _ = draw_group(s, X, y, CW, view["review"], "review")
     for g in view["categories"]:
         if y > H:
@@ -536,12 +582,37 @@ def board_svg(view):
     s.rect(.5, .5, W - 1, H - 1, 9, "none", "#c9cdd6")
 
     return s.svg(W, H, (
-        f"PR Board in a browser, light theme, on the fictional demo organization: the header counts "
-        f"{c['ready']} ready to merge, {c['missing']} something missing, {c['approve']} ready to approve and "
-        f"{c['draft']} drafts, above the filter bar; a To review band lists {view['to_review']} teammates' PRs "
-        f"that ask for your review; then one band per category, one row per PR with a coloured left bar, the "
-        f"number, repository and branch, title, signal chips and the next step, and a PR that waits on another "
-        f"sitting under it."))
+        f"PR Board in a browser, light theme, on the fictional demo organization: a command bar with the "
+        f"search and the counters {c['ready']} ready, {c['missing']} missing, {c['approve']} approve and "
+        f"{c['draft']} drafts, above the filter bar; a To review group lists {view['to_review']} teammates' PRs "
+        f"that ask for your review; then one group per category, its heading with a bar of its status mix, and "
+        f"one row per PR with a coloured left bar, the number, the title, the repository, branch and signal "
+        f"chips under it, and the next step as a chip on the right: solid when it is your move, outlined on a "
+        f"faded row when you wait. A PR that waits on another sits under it."))
+
+
+def flex_wrap(items, x, width, gap):
+    """Lay items out like flex-wrap: [(w, h, draw, grow)], one line at a time."""
+    lines, cur, used = [], [], 0
+    for it in items:
+        need = it[0] + (gap if cur else 0)
+        if cur and used + need > width:
+            lines.append(cur)
+            cur, used = [], 0
+            need = it[0]
+        cur.append(it)
+        used += need
+    lines.append(cur)
+    placed = []
+    for ln in lines:
+        free = width - sum(i[0] for i in ln) - gap * (len(ln) - 1)
+        grow = [i for i in ln if i[3]]
+        cx = x
+        for i in ln:
+            placed.append((cx, i))
+            cx += i[0] + (free / len(grow) if i in grow else 0) + gap
+        placed.append(None)
+    return placed
 
 
 def place_lines(placed, y, row_gap):
@@ -560,12 +631,12 @@ def place_lines(placed, y, row_gap):
     return top - row_gap
 
 
-# ── image 2: one band, annotated ─────────────────────────────────────────────
+# ── image 2: one group, annotated ────────────────────────────────────────────
 def anatomy_svg(view):
     W = 1100
     s = Svg()
     LABEL, HEAD, HAIR = "#4a5263", "#7a8191", "#a3aab8"
-    s.text(28, 34, "One band of the board, with the PR that waits on another at the bottom", 13, HEAD, MONO)
+    s.text(28, 34, "One group of the board, with the PR that waits on another at the bottom", 13, HEAD, MONO)
     s.line(28, 46, W - 28, 46, TOK["line"])
 
     group = next(g for g in view["categories"] if g["key"] == "Checkout")
@@ -573,7 +644,10 @@ def anatomy_svg(view):
     bottom, band, rows = draw_group(s, X, BY, W - 56, group, "cat")
     last = rows[-1]
     if not last["elbow"]:
-        raise SystemExit("the Checkout band no longer ends in a chained row")
+        raise SystemExit("the Checkout group no longer ends in a chained row")
+    mine = next((r for r, c in zip(rows, group["rows"]) if c.get("your_move")), None)
+    if not mine:
+        raise SystemExit("the Checkout group has no row that is your move")
 
     def call(x, y1, y2, text, ty, anchor="middle"):
         s.line(x, y1, x, y2, HAIR)
@@ -581,24 +655,60 @@ def anatomy_svg(view):
             s.text(x, ty, text, 12, LABEL, MONO, anchor=anchor)
 
     mid = lambda a: (a[0] + a[1]) / 2  # noqa: E731
-    # above the band
-    call(mid(band["name"]), 104, BY + 6, "category, from [Checkout] in the title", 96, "start")
-    call(mid(band["repos"]), 132, BY + 8, "its repositories", 124)
-    call(mid(band["dots"]), 132, BY + 8, "open PRs per colour", 124)
-    call(mid(band["merged"]), 104, BY + 8, "merged, until Clean up", 96, "end")
+    # above the heading
+    call(mid(band["name"]), 104, BY + 4, "category, from [Checkout] in the title", 96, "start")
+    call(mid(band["repos"]), 132, BY + 6, "its repositories", 124)
+    call(mid(band["mix"]), 132, BY + 9, "open PRs per colour", 124)
+    call(mid(band["merged"]), 104, BY + 6, "open, and merged until Clean up", 96, "end")
 
-    # below the last row; a line never crosses a label above its own
+    # left of the first chip that is your move, in the row's empty middle
+    lx = mine["next"][0] - 6
+    if lx - 30 - mw("solid: your move", 12) < max(mine["chips"][1], mine["title"][1]) + 20:
+        raise SystemExit("no room for the your-move callout")
+    s.line(lx - 24, mine["mid"], lx, mine["mid"], HAIR)
+    s.text(lx - 30, mine["mid"] + 4, "solid: your move", 12, LABEL, MONO, anchor="end")
+
+    # below the last row. Labels start at their line and run right; placed
+    # right to left, each takes the first level where it overlaps no label,
+    # so no line ever crosses a label above its own.
     top = last["y"] + last["h"] + 2
-    lv = (top + 26, top + 52, top + 78)
-    bx = last["x"] + 2.5
-    call(bx, top - 4, lv[2] - 12, "colour: what it still needs", lv[2], "start")
-    call(mid(last["num"]), top - 10, lv[0] - 12, "number", lv[0])
-    call(mid(last["repo"]), top - 10, lv[1] - 12, "repo → the branch it merges into", lv[1])
-    call(mid(last["title"]), top - 10, lv[0] - 12, "title, minus its [Checkout]", lv[0])
-    call(mid(last["after"]), top - 10, lv[2] - 12, "waits on #412, the row above", lv[2])
-    cx = mid(last["chips"])
-    call(cx, top - 10, lv[1] - 12, "signals, always in this order", lv[1], "start")
-    call(mid(last["next"]), top - 10, lv[0] - 12, "the next step", lv[0])
+    meta_end = max(last["chips"][1], last["after"][1])
+    title_x = max(mid(last["title"]), meta_end + 14)
+    if title_x > last["title"][1] - 4:
+        raise SystemExit("the title of the last row has no clear spot for its callout")
+    nxt = "next step: outlined and faded, you wait"
+    callouts = [  # (x, from y, label, anchor)
+        (mid(last["next"]), last["mid"] + 13, nxt, "end"),
+        (title_x, last["top"] + 8, "title first, minus its [Checkout]", "start"),
+        (mid(last["chips"]), last["meta"] + 12, "signals, always in this order", "start"),
+        (mid(last["after"]), last["meta"] + 8, "waits on #412, the row above", "start"),
+        (mid(last["repo"]), last["meta"] + 8, "repo → the branch it merges into", "start"),
+        (mid(last["num"]), last["top"] + 8, "number", "start"),
+        (last["x"] + 2.5, top - 4, "colour: what it still needs", "start"),
+    ]
+    taken = []   # (level, x0, x1, line x)
+
+    def fits(lvl, x0, x1, x):
+        for L, a, b, lx in taken:
+            if L == lvl and x0 < b + 16 and a < x1 + 16:
+                return False   # overlaps a label on its level
+            if L < lvl and a - 6 <= x <= b + 6:
+                return False   # its line would cross a label above
+            if L > lvl and x0 - 6 <= lx <= x1 + 6:
+                return False   # its label would sit on a deeper line
+        return True
+    for x, y1, text, anchor in callouts:
+        w = mw(text, 12)
+        x0, x1 = (x - w, x) if anchor == "end" else (x, x + w)
+        lvl = 0
+        while not fits(lvl, x0, x1, x):
+            lvl += 1
+            if lvl > 8:
+                raise SystemExit(f"no level for the callout {text!r}")
+        taken.append((lvl, x0, x1, x))
+        ly = top + 26 * (lvl + 1)
+        call(x, y1, ly - 12, text, ly, anchor)
+    lv = (top + 26 * (max(t[0] for t in taken) + 1),) * 3
 
     # the strip: colours and every signal, from the page's legend tables
     STRIP = lv[2] + 44
@@ -628,18 +738,31 @@ def anatomy_svg(view):
             s.text(tx, yy, K[k]["name"], 12, LABEL)
             if tx + tw(K[k]["name"], 12) > W - 20:
                 raise SystemExit(f"legend text for {k} runs off the image")
-    H = STRIP + per * 26 + 14
+
+    # the next steps, from the legend's own table: yours first, then the waits
+    NEXT = STRIP + per * 26 + 40
+    s.line(28, NEXT - 18, W - 28, NEXT - 18, TOK["line"])
+    s.text(28, NEXT, "NEXT STEP: SOLID WHEN IT IS YOUR MOVE, OUTLINED WHEN YOU WAIT", 10, HEAD, MONO)
+    ny, nx_ = NEXT + 24, 28
+    for kind, d in sorted(NX.items(), key=lambda kv: not kv[1]["mine"]):
+        w = next_width(d["sample"])
+        if nx_ + w > W - 28:
+            ny, nx_ = ny + 34, 28
+        draw_next(s, nx_ + w, ny, kind, d["sample"], d["mine"], TOK["bg"])
+        nx_ += w + 8
+    H = ny + 30
     frame, s.out = s.out, []
     s.rect(0, 0, W, H, 9, TOK["bg"])
     s.out += frame
     s.rect(.5, .5, W - 1, H - 1, 9, "none", "#c9cdd6")
     return s.svg(W, H, (
-        "One band of PR Board, annotated. The band names the category, its repositories, how many open PRs "
-        "it has per colour and how many merged ones. Each row has a left bar coloured by what the PR still "
-        "needs, its number, the repository and the branch it merges into, the title without its category tag, "
-        "the signal chips and the next step; a PR that waits on another sits under it with an elbow and an "
-        "after #412 label. Below, the bar colours and every signal chip with its meaning, taken from the "
-        "page's legend."))
+        "One group of PR Board, annotated. The heading names the category and its repositories, then a bar of "
+        "its open PRs per colour, how many are open and how many merged. Each row has a left bar coloured by "
+        "what the PR still needs and its number; the title comes first, without its category tag, with the "
+        "repository, the branch it merges into and the signal chips under it; the next step is a chip on the "
+        "right, solid when it is your move and outlined, on a faded row, when you wait. A PR that waits on "
+        "another sits under it with an elbow and an after #412 label. Below, the bar colours, every signal "
+        "chip with its meaning and every next-step chip, taken from the page's legend."))
 
 
 # ── image 3: the terminal ────────────────────────────────────────────────────
